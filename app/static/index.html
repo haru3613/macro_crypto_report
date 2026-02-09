@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Macro Crypto 策略儀表板</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="halo halo-a"></div>
+    <div class="halo halo-b"></div>
+
+    <header class="hero">
+      <div>
+        <p class="eyebrow" data-i18n="eyebrow">Macro + Crypto Signal Desk</p>
+        <h1 data-i18n="title">即時策略決策儀表板</h1>
+        <p class="subhead" data-i18n="subtitle">以 /signals 與 /report 即時資料生成可執行建議</p>
+      </div>
+      <div class="hero-controls">
+        <label class="lang-wrap" for="lang-select" data-i18n="langLabel">語言</label>
+        <select id="lang-select" class="lang-select">
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+        </select>
+        <button id="refresh-btn" class="refresh-btn" data-i18n="refresh">重新整理</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel kpi-panel">
+        <h2 data-i18n="marketPulse">市場脈搏</h2>
+        <div class="kpi-grid">
+          <article class="kpi">
+            <span data-i18n="asOf">資料時間</span>
+            <strong id="as-of">-</strong>
+          </article>
+          <article class="kpi">
+            <span data-i18n="curveSlope">殖利率曲線 10Y-2Y</span>
+            <strong id="curve-slope">-</strong>
+          </article>
+          <article class="kpi">
+            <span data-i18n="cmeGap">CME 缺口</span>
+            <strong id="cme-gap">-</strong>
+          </article>
+          <article class="kpi">
+            <span data-i18n="fundingState">Funding 狀態</span>
+            <strong id="funding-state">-</strong>
+          </article>
+          <article class="kpi">
+            <span data-i18n="oiState">OI 狀態</span>
+            <strong id="oi-state">-</strong>
+          </article>
+          <article class="kpi">
+            <span data-i18n="stablecoin24">穩定幣 24h 淨流</span>
+            <strong id="flow-24h">-</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel split-panel">
+        <article>
+          <h2 data-i18n="signalSummary">訊號總覽</h2>
+          <div class="metric-row"><span data-i18n="m15Buy">15m 買入</span><strong id="sum-15m-buy">-</strong></div>
+          <div class="metric-row"><span data-i18n="m15Sell">15m 賣出</span><strong id="sum-15m-sell">-</strong></div>
+          <div class="metric-row"><span data-i18n="m15Hold">15m 觀望</span><strong id="sum-15m-hold">-</strong></div>
+          <div class="metric-row"><span data-i18n="d1Acc">1d 加碼</span><strong id="sum-1d-acc">-</strong></div>
+          <div class="metric-row"><span data-i18n="d1Reduce">1d 減碼</span><strong id="sum-1d-red">-</strong></div>
+          <div class="metric-row"><span data-i18n="d1Hold">1d 觀望</span><strong id="sum-1d-hold">-</strong></div>
+        </article>
+
+        <article>
+          <h2 data-i18n="ratesFedwatch">利率與 FedWatch</h2>
+          <div class="metric-row"><span>10Y</span><strong id="ten-year">-</strong></div>
+          <div class="metric-row"><span>2Y</span><strong id="two-year">-</strong></div>
+          <div class="metric-row"><span data-i18n="cut">降息</span><strong id="fed-cut">-</strong></div>
+          <div class="metric-row"><span data-i18n="hold">維持</span><strong id="fed-hold">-</strong></div>
+          <div class="metric-row"><span data-i18n="hike">升息</span><strong id="fed-hike">-</strong></div>
+          <div class="metric-row"><span data-i18n="fundingRate">Funding Rate</span><strong id="funding-rate">-</strong></div>
+          <div class="metric-row"><span data-i18n="oiChange">OI 7d 變化</span><strong id="oi-change">-</strong></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2 data-i18n="signalsTitle">最新可執行訊號</h2>
+        <pre id="signals-preview">Loading...</pre>
+      </section>
+
+      <section class="panel">
+        <h2 data-i18n="weeklyTitle">週報內容</h2>
+        <pre id="report-markdown">Loading...</pre>
+      </section>
+
+      <section class="panel">
+        <h2 data-i18n="aiTitle">AI 分析與建議</h2>
+        <p class="meta">
+          <span data-i18n="source">來源</span>: <span id="ai-source">-</span>
+          <span class="divider">|</span>
+          <span data-i18n="model">模型</span>: <span id="ai-model">-</span>
+        </p>
+        <pre id="ai-advice">Loading...</pre>
+      </section>
+    </main>
+
+    <p id="status" class="status">Loading...</p>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
