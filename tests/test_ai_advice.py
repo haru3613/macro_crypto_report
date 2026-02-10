@@ -8,15 +8,15 @@ def test_generate_ai_advice_fallback_without_key():
     advice = generate_ai_advice(
         context,
         "# test",
-        settings=Settings(openai_api_key=""),
+        settings=Settings(gemini_api_key=""),
     )
     assert advice["source"] == "fallback_rules"
     assert "Top Risks" in advice["analysis_markdown"]
 
 
-def test_generate_ai_advice_openai_success(monkeypatch):
+def test_generate_ai_advice_gemini_success(monkeypatch):
     context = make_sample_context()
-    payload = '{"output_text":"## AI\\n- Keep risk tight"}'
+    payload = '{"candidates":[{"content":{"parts":[{"text":"## AI\\n- Keep risk tight"}]}}]}'
 
     def fake_urlopen(_req, timeout=30):
         assert timeout == 30
@@ -27,8 +27,8 @@ def test_generate_ai_advice_openai_success(monkeypatch):
     advice = generate_ai_advice(
         context,
         "# test",
-        settings=Settings(openai_api_key="test-key", openai_model="gpt-test"),
+        settings=Settings(gemini_api_key="test-key", gemini_model="gemini-2.0-flash"),
     )
-    assert advice["source"] == "openai"
-    assert advice["model"] == "gpt-test"
+    assert advice["source"] == "gemini"
+    assert advice["model"] == "gemini-2.0-flash"
     assert "Keep risk tight" in advice["analysis_markdown"]

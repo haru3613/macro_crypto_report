@@ -71,3 +71,4 @@ Both use ATR-based entry/stop/TP bands and confidence-based position sizing (3-8
 | Stablecoin flows | DefiLlama | No |
 | FOMC schedule | Static 2025-2026 calendar | No |
 | FedWatch | **Placeholder only** (no free API) | — |
+| AI advice | Gemini `generateContent` API | GEMINI_API_KEY |

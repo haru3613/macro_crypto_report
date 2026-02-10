@@ -43,6 +43,10 @@ const I18N = {
     liveBadge: "Live",
     placeholderBadge: "假資料",
     placeholderWarning: "假資料",
+    aiStart: "開始 AI 分析",
+    aiLoading: "AI 分析中...",
+    aiIdle: "點擊上方按鈕開始 AI 分析",
+    aiFailed: "AI 分析失敗",
   },
   en: {
     eyebrow: "Macro + Crypto Signal Desk",
@@ -84,6 +88,10 @@ const I18N = {
     liveBadge: "Live",
     placeholderBadge: "Placeholder",
     placeholderWarning: "Placeholder",
+    aiStart: "Run AI Analysis",
+    aiLoading: "Analyzing...",
+    aiIdle: "Click the button above to run AI analysis",
+    aiFailed: "AI analysis failed",
   },
 };
 
@@ -144,6 +152,8 @@ function fmtPct(value, digits = 2) {
 
 function setI18nText() {
   document.querySelectorAll("[data-i18n]").forEach((node) => {
+    // Skip ai-advice <pre> — its content is managed by loadAiAdvice()
+    if (node.id === "ai-advice") return;
     const key = node.dataset.i18n;
     node.textContent = t(key);
   });
@@ -169,14 +179,23 @@ function renderSourceStatus(placeholderSources) {
   ALL_SOURCES.forEach((src) => {
     const isPlaceholder = placeholderSet.has(src.key);
     const item = document.createElement("div");
-    item.className = `source-status-item ${isPlaceholder ? "placeholder" : "live"}`;
+
+    const baseCls = "flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm";
+    if (isPlaceholder) {
+      item.className = `${baseCls} border-amber-500/20 bg-amber-950/20 text-amber-300`;
+    } else {
+      item.className = `${baseCls} border-emerald-500/20 bg-emerald-950/20 text-emerald-300`;
+    }
 
     const label = currentLang === "zh-TW" ? src.labelZh : src.labelEn;
     const badgeText = isPlaceholder ? t("placeholderBadge") : t("liveBadge");
-    const badgeClass = isPlaceholder ? "placeholder" : "live";
     const icon = isPlaceholder ? "\u26a0\ufe0f" : "\u2705";
 
-    item.innerHTML = `<span>${icon}</span><span>${label}</span><span class="source-badge ${badgeClass}">${badgeText}</span>`;
+    const badgeCls = isPlaceholder
+      ? "text-xs px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold"
+      : "text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold";
+
+    item.innerHTML = `<span>${icon}</span><span class="flex-1 text-slate-300">${label}</span><span class="${badgeCls}">${badgeText}</span>`;
     grid.appendChild(item);
   });
 
@@ -197,15 +216,28 @@ function renderSourceStatus(placeholderSources) {
   });
 }
 
-async function loadWeeklyReport() {
+// --- AI section state management ---
+function resetAiSection() {
+  byId("ai-idle").classList.remove("hidden");
+  byId("ai-output").classList.add("hidden");
+  byId("ai-advice").textContent = "";
+  byId("ai-source").textContent = "-";
+  byId("ai-model").textContent = "-";
+  const srcMobile = byId("ai-source-mobile");
+  const modelMobile = byId("ai-model-mobile");
+  if (srcMobile) srcMobile.textContent = "-";
+  if (modelMobile) modelMobile.textContent = "-";
+}
+
+// --- Data loading (no AI) ---
+async function loadDashboard() {
   const status = byId("status");
   status.textContent = t("statusSyncing");
 
   try {
-    const response = await fetch(`/report/weekly/advice?lang=${encodeURIComponent(qsLang())}`);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    // Fetch report context + markdown (no AI call)
+    const response = await fetch(`/report/weekly?lang=${encodeURIComponent(qsLang())}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     const context = payload.context;
 
@@ -225,30 +257,30 @@ async function loadWeeklyReport() {
     byId("oi-change").textContent = fmtPct(context.derivatives.open_interest_change_7d, 0);
 
     byId("report-markdown").textContent = payload.report_markdown;
-    byId("ai-source").textContent = payload.ai_advice.source || "-";
-    byId("ai-model").textContent = payload.ai_advice.model || "-";
-    byId("ai-advice").textContent = payload.ai_advice.analysis_markdown || t("noAdvice");
 
     // Render data source status panel
     renderSourceStatus(context.placeholder_sources || []);
 
+    // Fetch signals
     const signalsResponse = await fetch("/signals/latest");
-    if (!signalsResponse.ok) {
-      throw new Error(`Signals HTTP ${signalsResponse.status}`);
-    }
+    if (!signalsResponse.ok) throw new Error(`Signals HTTP ${signalsResponse.status}`);
     const signalsPayload = await signalsResponse.json();
 
-    const summary = payload.signals_summary || {};
-    const sum15m = summary["15m"] || {};
-    const sum1d = summary["1d"] || {};
-    byId("sum-15m-buy").textContent = sum15m.buy ?? "-";
-    byId("sum-15m-sell").textContent = sum15m.sell ?? "-";
-    byId("sum-15m-hold").textContent = sum15m.hold ?? "-";
-    byId("sum-1d-acc").textContent = sum1d.accumulate ?? "-";
-    byId("sum-1d-red").textContent = sum1d.reduce ?? "-";
-    byId("sum-1d-hold").textContent = sum1d.hold ?? "-";
+    const signals = signalsPayload.signals || [];
+    const sum15m = { buy: 0, sell: 0, hold: 0 };
+    const sum1d = { accumulate: 0, reduce: 0, hold: 0 };
+    signals.forEach((s) => {
+      if (s.timeframe === "15m" && s.action in sum15m) sum15m[s.action]++;
+      if (s.timeframe === "1d" && s.action in sum1d) sum1d[s.action]++;
+    });
+    byId("sum-15m-buy").textContent = sum15m.buy;
+    byId("sum-15m-sell").textContent = sum15m.sell;
+    byId("sum-15m-hold").textContent = sum15m.hold;
+    byId("sum-1d-acc").textContent = sum1d.accumulate;
+    byId("sum-1d-red").textContent = sum1d.reduce;
+    byId("sum-1d-hold").textContent = sum1d.hold;
 
-    const previewLines = (signalsPayload.signals || []).slice(0, 12).map(formatSignalLine);
+    const previewLines = signals.slice(0, 12).map(formatSignalLine);
     byId("signals-preview").textContent = previewLines.join("\n\n") || t("noSignals");
 
     status.textContent = t("statusDone");
@@ -257,12 +289,53 @@ async function loadWeeklyReport() {
   }
 }
 
+// --- AI analysis (on-demand only, never called automatically) ---
+async function loadAiAdvice() {
+  const btn = byId("ai-btn");
+  const pre = byId("ai-advice");
+  const idleDiv = byId("ai-idle");
+  const outputDiv = byId("ai-output");
+
+  btn.disabled = true;
+  btn.textContent = t("aiLoading");
+
+  // Switch from idle to output view
+  idleDiv.classList.add("hidden");
+  outputDiv.classList.remove("hidden");
+  pre.textContent = t("aiLoading");
+  byId("ai-source").textContent = "-";
+  byId("ai-model").textContent = "-";
+  const srcMobile = byId("ai-source-mobile");
+  const modelMobile = byId("ai-model-mobile");
+  if (srcMobile) srcMobile.textContent = "-";
+  if (modelMobile) modelMobile.textContent = "-";
+
+  try {
+    const response = await fetch(`/report/weekly/ai?lang=${encodeURIComponent(qsLang())}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const advice = await response.json();
+
+    byId("ai-source").textContent = advice.source || "-";
+    byId("ai-model").textContent = advice.model || "-";
+    if (srcMobile) srcMobile.textContent = advice.source || "-";
+    if (modelMobile) modelMobile.textContent = advice.model || "-";
+    pre.textContent = advice.analysis_markdown || t("noAdvice");
+  } catch (error) {
+    pre.textContent = `${t("aiFailed")}: ${error.message}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t("aiStart");
+  }
+}
+
 byId("lang-select").addEventListener("change", (event) => {
   currentLang = event.target.value;
   setI18nText();
-  loadWeeklyReport();
+  resetAiSection();
+  loadDashboard();
 });
 
-byId("refresh-btn").addEventListener("click", loadWeeklyReport);
+byId("refresh-btn").addEventListener("click", loadDashboard);
+byId("ai-btn").addEventListener("click", loadAiAdvice);
 setI18nText();
-loadWeeklyReport();
+loadDashboard();

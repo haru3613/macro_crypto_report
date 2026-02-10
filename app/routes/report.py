@@ -45,3 +45,11 @@ def weekly_report_with_ai_advice(lang: Literal["en", "zh-TW"] = Query(default="z
         "ai_advice": advice,
         "signals_summary": summary,
     }
+
+
+@router.get("/weekly/ai")
+def ai_advice_only(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dict:
+    """Generate AI advice only, without re-fetching all source data."""
+    context, markdown = _build_weekly_payload(lang=lang)
+    advice = generate_ai_advice(context, markdown, lang=lang, settings=get_settings())
+    return advice

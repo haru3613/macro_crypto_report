@@ -10,7 +10,29 @@ logger = logging.getLogger(__name__)
 
 COINGECKO_MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_EXCHANGE_INFO_URL = "https://api.binance.com/api/v3/exchangeInfo"
 DEFAULT_EXCLUDED_SYMBOLS = {"USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDE"}
+
+# Cached set of valid Binance USDT pairs
+_binance_usdt_pairs: set[str] | None = None
+
+
+def _get_binance_usdt_pairs() -> set[str]:
+    """Fetch and cache the set of valid USDT trading pairs from Binance."""
+    global _binance_usdt_pairs
+    if _binance_usdt_pairs is not None:
+        return _binance_usdt_pairs
+    try:
+        with urlopen(f"{BINANCE_EXCHANGE_INFO_URL}?permissions=SPOT", timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        _binance_usdt_pairs = {
+            s["symbol"] for s in data.get("symbols", [])
+            if s.get("quoteAsset") == "USDT" and s.get("status") == "TRADING"
+        }
+    except Exception as exc:
+        logger.warning("Binance exchangeInfo fetch failed: %s", exc)
+        _binance_usdt_pairs = set()
+    return _binance_usdt_pairs
 
 
 def utc_now_iso() -> str:
@@ -41,12 +63,18 @@ def fetch_top_symbols_vs_usdt(limit: int = 10) -> dict:
             "is_placeholder": True,
         }
 
+    valid_pairs = _get_binance_usdt_pairs()
     symbols: list[str] = []
     for coin in coins:
         symbol = str(coin.get("symbol", "")).upper()
         if not symbol or symbol in DEFAULT_EXCLUDED_SYMBOLS:
             continue
+        if not symbol.isalnum():
+            continue
         pair = f"{symbol}USDT"
+        # Only include pairs that actually exist on Binance
+        if valid_pairs and pair not in valid_pairs:
+            continue
         if pair not in symbols:
             symbols.append(pair)
         if len(symbols) >= max(limit + 2, 12):

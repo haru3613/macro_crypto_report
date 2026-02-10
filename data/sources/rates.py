@@ -17,10 +17,12 @@ def _fetch_latest_fred_rate(csv_url: str, column: str) -> tuple[str, float]:
         text = response.read().decode("utf-8")
 
     rows = list(csv.DictReader(io.StringIO(text)))
+    # FRED CSV uses 'observation_date' (new) or 'DATE' (legacy)
+    date_key = "observation_date" if "observation_date" in rows[0] else "DATE"
     for row in reversed(rows):
         value = row.get(column, "")
         if value and value != ".":
-            return row["DATE"], float(value)
+            return row[date_key], float(value)
     raise ValueError(f"No valid values found for {column}")
 
 

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,8 @@ SYSTEM_PROMPT_ZH = """你是宏觀與加密市場風險分析師。
 請使用繁體中文與 markdown 短條列。
 """
 
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
 
 def _system_prompt(lang: str) -> str:
     if lang.lower().startswith("zh"):
@@ -36,17 +38,15 @@ def _system_prompt(lang: str) -> str:
     return SYSTEM_PROMPT_EN
 
 
-def _extract_output_text(payload: dict[str, Any]) -> str:
-    output_text = payload.get("output_text")
-    if isinstance(output_text, str) and output_text.strip():
-        return output_text.strip()
-
-    lines: list[str] = []
-    for item in payload.get("output", []):
-        for content in item.get("content", []):
-            if content.get("type") == "output_text" and content.get("text"):
-                lines.append(content["text"])
-    return "\n".join(lines).strip()
+def _extract_gemini_text(payload: dict) -> str:
+    """Extract text from Gemini API response."""
+    candidates = payload.get("candidates", [])
+    if not candidates:
+        return ""
+    content = candidates[0].get("content", {})
+    parts = content.get("parts", [])
+    texts = [p.get("text", "") for p in parts if p.get("text")]
+    return "\n".join(texts).strip()
 
 
 def _fallback_advice(context: ReportContext, lang: str = "en") -> str:
@@ -153,27 +153,25 @@ def generate_ai_advice(
     settings: Settings | None = None,
 ) -> dict:
     settings = settings or get_settings()
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         return {
             "analysis_markdown": _fallback_advice(context, lang=lang),
             "source": "fallback_rules",
             "model": "none",
         }
 
+    url = GEMINI_API_URL.format(model=settings.gemini_model) + "?" + urlencode({
+        "key": settings.gemini_api_key,
+    })
+
     request_body = {
-        "model": settings.openai_model,
-        "temperature": 0.2,
-        "max_output_tokens": 800,
-        "input": [
+        "system_instruction": {
+            "parts": [{"text": _system_prompt(lang)}],
+        },
+        "contents": [
             {
-                "role": "system",
-                "content": [{"type": "input_text", "text": _system_prompt(lang)}],
-            },
-            {
-                "role": "user",
-                "content": [
+                "parts": [
                     {
-                        "type": "input_text",
                         "text": (
                             f"Language preference: {lang}\n\n"
                             "Structured context JSON:\n"
@@ -183,35 +181,36 @@ def generate_ai_advice(
                         ),
                     }
                 ],
-            },
+            }
         ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 800,
+        },
     }
 
     try:
         req = Request(
-            settings.openai_base_url,
+            url,
             data=json.dumps(request_body).encode("utf-8"),
             method="POST",
-            headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
         )
         with urlopen(req, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
-        text = _extract_output_text(payload)
+        text = _extract_gemini_text(payload)
         if not text:
             raise ValueError("Empty model response")
         return {
             "analysis_markdown": text,
-            "source": "openai",
-            "model": settings.openai_model,
+            "source": "gemini",
+            "model": settings.gemini_model,
         }
     except Exception as exc:
-        logger.error("OpenAI API call failed, falling back to rules: %s", exc)
+        logger.error("Gemini API call failed, falling back to rules: %s", exc)
         return {
             "analysis_markdown": _fallback_advice(context, lang=lang),
             "source": "fallback_rules",
-            "model": settings.openai_model,
+            "model": settings.gemini_model,
             "error": str(exc),
         }
