@@ -182,8 +182,59 @@ h1 {
 
 .layout > .panel:nth-child(3),
 .layout > .panel:nth-child(4),
-.layout > .panel:nth-child(5) {
+.layout > .panel:nth-child(5),
+.layout > .panel:nth-child(6) {
   grid-column: 1 / -1;
+}
+
+.source-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.source-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 0.88rem;
+}
+
+.source-status-item.live {
+  border-color: rgba(15, 138, 82, 0.25);
+}
+
+.source-status-item.placeholder {
+  border-color: rgba(143, 95, 0, 0.25);
+  background: rgba(255, 244, 230, 0.5);
+}
+
+.source-badge {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.source-badge.live {
+  background: rgba(15, 138, 82, 0.12);
+  color: var(--ok);
+}
+
+.source-badge.placeholder {
+  background: rgba(143, 95, 0, 0.12);
+  color: var(--warn);
+}
+
+.kpi-placeholder-badge {
+  font-size: 0.7rem;
+  color: var(--warn);
+  margin-left: 4px;
 }
 
 .metric-row {

@@ -12,5 +12,6 @@ def fetch_fedwatch_probabilities() -> dict:
             "hike": 0.20,
         },
         "source": "CME FedWatch (placeholder)",
-        "note": "Replace with live FedWatch API or scraped data.",
+        "is_placeholder": True,
+        "note": "No free API available. Replace with live FedWatch API when accessible.",
     }

@@ -1,8 +1,11 @@
 """Generate AI analysis and suggestions from report context."""
 
 import json
+import logging
 from typing import Any
 from urllib.request import Request, urlopen
+
+logger = logging.getLogger(__name__)
 
 from app.config import Settings, get_settings
 from report.schema import ReportContext
@@ -205,6 +208,7 @@ def generate_ai_advice(
             "model": settings.openai_model,
         }
     except Exception as exc:
+        logger.error("OpenAI API call failed, falling back to rules: %s", exc)
         return {
             "analysis_markdown": _fallback_advice(context, lang=lang),
             "source": "fallback_rules",

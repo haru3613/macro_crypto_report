@@ -2,6 +2,11 @@
 
 
 def derive_derivatives_state(derivs: dict) -> dict:
+    """Classify funding rate and open interest into categorical states.
+
+    Funding states: overheated (> 0.02), short_bias (< 0), neutral.
+    OI states: expanding (7d change > 5%), deleveraging (< -5%), stable.
+    """
     funding = derivs["funding_rate"]
     open_interest_change = derivs["open_interest_change_7d"]
     if funding > 0.02:

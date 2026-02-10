@@ -1,9 +1,12 @@
 """Market data sources for symbols and OHLCV."""
 
 import json
+import logging
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 from urllib.request import urlopen
+
+logger = logging.getLogger(__name__)
 
 COINGECKO_MARKETS_URL = "https://api.coingecko.com/api/v3/coins/markets"
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
@@ -11,6 +14,8 @@ DEFAULT_EXCLUDED_SYMBOLS = {"USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDE"}
 
 
 def utc_now_iso() -> str:
+    # Canonical version lives in signals.schema; keep a local alias to
+    # avoid a cross-layer import from data -> signals.
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
@@ -26,12 +31,14 @@ def fetch_top_symbols_vs_usdt(limit: int = 10) -> dict:
     try:
         with urlopen(url, timeout=15) as response:
             coins = json.loads(response.read().decode("utf-8"))
-    except Exception:
+    except Exception as exc:
+        logger.warning("CoinGecko fetch failed, using fallback: %s", exc)
         return {
             "as_of": utc_now_iso(),
             "symbols": ["BTCUSDT", "ETHUSDT"],
             "source": "coingecko_fallback",
             "degraded_reason": "coingecko_unavailable",
+            "is_placeholder": True,
         }
 
     symbols: list[str] = []
@@ -62,6 +69,7 @@ def fetch_top_symbols_vs_usdt(limit: int = 10) -> dict:
         "symbols": final_symbols,
         "source": "coingecko",
         "degraded_reason": "",
+        "is_placeholder": False,
     }
 
 
@@ -90,8 +98,10 @@ def fetch_binance_klines(symbol: str, interval: str, limit: int) -> dict:
             "candles": candles,
             "source": "binance",
             "degraded_reason": "",
+            "is_placeholder": False,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("Binance klines fetch failed for %s/%s: %s", symbol, interval, exc)
         return {
             "as_of": utc_now_iso(),
             "symbol": symbol,
@@ -99,4 +109,5 @@ def fetch_binance_klines(symbol: str, interval: str, limit: int) -> dict:
             "candles": [],
             "source": "binance_fallback",
             "degraded_reason": "binance_unavailable",
+            "is_placeholder": True,
         }

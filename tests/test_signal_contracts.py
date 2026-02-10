@@ -1,4 +1,4 @@
-from app.routes.report import summarize_signals
+from signals.summary import summarize_signals
 
 
 def test_signals_summary_contract_shape():

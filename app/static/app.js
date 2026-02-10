@@ -39,6 +39,10 @@ const I18N = {
     statusFailed: "讀取失敗",
     noSignals: "目前沒有訊號。",
     noAdvice: "目前無 AI 建議。",
+    sourceStatusTitle: "資料來源狀態",
+    liveBadge: "Live",
+    placeholderBadge: "假資料",
+    placeholderWarning: "假資料",
   },
   en: {
     eyebrow: "Macro + Crypto Signal Desk",
@@ -76,6 +80,10 @@ const I18N = {
     statusFailed: "Failed to load",
     noSignals: "No signals.",
     noAdvice: "No AI advice.",
+    sourceStatusTitle: "Data Source Status",
+    liveBadge: "Live",
+    placeholderBadge: "Placeholder",
+    placeholderWarning: "Placeholder",
   },
 };
 
@@ -98,6 +106,19 @@ const ACTION_LABEL = {
   },
   en: {},
 };
+
+// All known data sources and which KPI elements they relate to
+const ALL_SOURCES = [
+  { key: "Yield Curve", labelZh: "殖利率曲線", labelEn: "Yield Curve", kpiIds: ["curve-slope", "ten-year", "two-year"] },
+  { key: "CPI", labelZh: "CPI 消費者物價", labelEn: "CPI", kpiIds: [] },
+  { key: "NFP", labelZh: "非農就業", labelEn: "NFP", kpiIds: [] },
+  { key: "ISM PMI", labelZh: "ISM PMI", labelEn: "ISM PMI", kpiIds: [] },
+  { key: "FOMC", labelZh: "FOMC 日程", labelEn: "FOMC Schedule", kpiIds: [] },
+  { key: "FedWatch", labelZh: "FedWatch 機率", labelEn: "FedWatch Probabilities", kpiIds: ["fed-cut", "fed-hold", "fed-hike"] },
+  { key: "CME OHLC", labelZh: "CME 缺口", labelEn: "CME Gap", kpiIds: ["cme-gap"] },
+  { key: "Crypto Derivatives", labelZh: "加密衍生品", labelEn: "Crypto Derivatives", kpiIds: ["funding-state", "oi-state", "funding-rate", "oi-change"] },
+  { key: "Stablecoin Flows", labelZh: "穩定幣流向", labelEn: "Stablecoin Flows", kpiIds: ["flow-24h"] },
+];
 
 let currentLang = "zh-TW";
 
@@ -140,6 +161,42 @@ function formatSignalLine(signal) {
   ].join("\n");
 }
 
+function renderSourceStatus(placeholderSources) {
+  const grid = byId("source-status-grid");
+  grid.innerHTML = "";
+  const placeholderSet = new Set(placeholderSources || []);
+
+  ALL_SOURCES.forEach((src) => {
+    const isPlaceholder = placeholderSet.has(src.key);
+    const item = document.createElement("div");
+    item.className = `source-status-item ${isPlaceholder ? "placeholder" : "live"}`;
+
+    const label = currentLang === "zh-TW" ? src.labelZh : src.labelEn;
+    const badgeText = isPlaceholder ? t("placeholderBadge") : t("liveBadge");
+    const badgeClass = isPlaceholder ? "placeholder" : "live";
+    const icon = isPlaceholder ? "\u26a0\ufe0f" : "\u2705";
+
+    item.innerHTML = `<span>${icon}</span><span>${label}</span><span class="source-badge ${badgeClass}">${badgeText}</span>`;
+    grid.appendChild(item);
+  });
+
+  // Add placeholder warning badges to KPI values
+  document.querySelectorAll(".kpi-placeholder-badge").forEach((el) => el.remove());
+  ALL_SOURCES.forEach((src) => {
+    if (placeholderSet.has(src.key)) {
+      src.kpiIds.forEach((id) => {
+        const el = byId(id);
+        if (el) {
+          const badge = document.createElement("span");
+          badge.className = "kpi-placeholder-badge";
+          badge.textContent = ` \u26a0\ufe0f ${t("placeholderWarning")}`;
+          el.parentNode.appendChild(badge);
+        }
+      });
+    }
+  });
+}
+
 async function loadWeeklyReport() {
   const status = byId("status");
   status.textContent = t("statusSyncing");
@@ -171,6 +228,9 @@ async function loadWeeklyReport() {
     byId("ai-source").textContent = payload.ai_advice.source || "-";
     byId("ai-model").textContent = payload.ai_advice.model || "-";
     byId("ai-advice").textContent = payload.ai_advice.analysis_markdown || t("noAdvice");
+
+    // Render data source status panel
+    renderSourceStatus(context.placeholder_sources || []);
 
     const signalsResponse = await fetch("/signals/latest");
     if (!signalsResponse.ok) {
@@ -205,4 +265,4 @@ byId("lang-select").addEventListener("change", (event) => {
 
 byId("refresh-btn").addEventListener("click", loadWeeklyReport);
 setI18nText();
-loadWeeklyReport();
+loadWeeklyReport();

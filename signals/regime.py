@@ -1,5 +1,6 @@
 """Regime state derivation."""
 
+from signals.config import RegimeConfig
 from signals.schema import RegimeState
 
 
@@ -7,28 +8,29 @@ def derive_regime_state(
     yield_curve_slope: float,
     event_risk_week: bool,
     btc_daily_volatility: float,
+    config: RegimeConfig = RegimeConfig(),
 ) -> RegimeState:
     macro_regime = "neutral"
-    if yield_curve_slope < -0.2:
+    if yield_curve_slope < config.yield_curve_risk_off:
         macro_regime = "risk_off_bias"
-    elif yield_curve_slope > 0.1:
+    elif yield_curve_slope > config.yield_curve_risk_on:
         macro_regime = "risk_on_bias"
 
-    if btc_daily_volatility >= 0.045:
+    if btc_daily_volatility >= config.vol_high_threshold:
         vol_regime = "high_vol"
-    elif btc_daily_volatility <= 0.02:
+    elif btc_daily_volatility <= config.vol_low_threshold:
         vol_regime = "low_vol"
     else:
         vol_regime = "normal_vol"
 
     leverage_multiplier = 1.0
     if event_risk_week:
-        leverage_multiplier *= 0.65
+        leverage_multiplier *= config.event_risk_multiplier
     if vol_regime == "high_vol":
-        leverage_multiplier *= 0.7
+        leverage_multiplier *= config.high_vol_multiplier
     if macro_regime == "risk_off_bias":
-        leverage_multiplier *= 0.8
-    leverage_multiplier = max(0.2, min(1.0, leverage_multiplier))
+        leverage_multiplier *= config.risk_off_multiplier
+    leverage_multiplier = max(config.leverage_min, min(config.leverage_max, leverage_multiplier))
 
     return RegimeState(
         macro_regime=macro_regime,

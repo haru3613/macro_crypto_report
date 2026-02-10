@@ -2,8 +2,11 @@
 
 import csv
 import io
+import logging
 from datetime import date
 from urllib.request import urlopen
+
+logger = logging.getLogger(__name__)
 
 FRED_DGS10_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10"
 FRED_DGS2_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS2"
@@ -31,11 +34,14 @@ def fetch_yield_curve() -> dict:
             "ten_year": ten_year,
             "two_year": two_year,
             "source": "FRED DGS10/DGS2",
+            "is_placeholder": False,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("FRED yield curve fetch failed, using placeholder: %s", exc)
         return {
             "as_of": date(2026, 2, 9).isoformat(),
             "ten_year": 4.05,
             "two_year": 4.35,
             "source": "Treasury yields (placeholder fallback)",
+            "is_placeholder": True,
         }

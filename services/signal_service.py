@@ -1,16 +1,34 @@
 """Signal service orchestration and caching."""
 
+import logging
+import threading
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from statistics import pstdev
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.config import Settings, get_settings
 from data.fetch_all import fetch_all_sources
 from data.sources.market import fetch_binance_klines, fetch_top_symbols_vs_usdt
 from indicators.compute import compute_report_context
+from report.schema import ReportContext
 from signals.engine import build_long_signal, build_short_signal
 from signals.regime import derive_regime_state
-from signals.schema import DataHealth, utc_now_iso
+from signals.schema import DataHealth, RegimeState, Signal, utc_now_iso
 from storage.sqlite_store import SQLiteStore
+
+
+@dataclass
+class MarketSnapshot:
+    """Aggregated market data fetched during a refresh cycle."""
+
+    context: ReportContext
+    symbols: list[str]
+    btc_volatility: float
+    health_rows: list[DataHealth] = field(default_factory=list)
+    raw_snapshots: list[tuple[str, dict[str, Any], str]] = field(default_factory=list)
 
 
 class SignalService:
@@ -19,6 +37,7 @@ class SignalService:
         self.store = SQLiteStore(self.settings.sqlite_path)
         self.last_short_refresh: datetime | None = None
         self.last_long_refresh: datetime | None = None
+        self._refresh_lock = threading.Lock()
 
     @staticmethod
     def _utc_now() -> datetime:
@@ -29,7 +48,8 @@ class SignalService:
             return True
         return self._utc_now() - last >= delta
 
-    def _calc_daily_volatility(self, candles: list[dict]) -> float:
+    @staticmethod
+    def _calc_daily_volatility(candles: list[dict]) -> float:
         closes = [c["close"] for c in candles]
         if len(closes) < 8:
             return 0.0
@@ -43,14 +63,8 @@ class SignalService:
             return 0.0
         return float(pstdev(returns))
 
-    def refresh(self, force: bool = False) -> None:
-        short_interval = timedelta(minutes=self.settings.short_refresh_minutes)
-        long_interval = timedelta(hours=self.settings.long_refresh_hours)
-        do_short = force or self._needs_refresh(self.last_short_refresh, short_interval)
-        do_long = force or self._needs_refresh(self.last_long_refresh, long_interval)
-        if not do_short and not do_long:
-            return
-
+    def _fetch_market_data(self) -> MarketSnapshot:
+        """Fetch all external data needed for signal generation."""
         health_rows: list[DataHealth] = []
 
         macro_raw = fetch_all_sources()
@@ -58,7 +72,6 @@ class SignalService:
 
         symbols_payload = fetch_top_symbols_vs_usdt(limit=self.settings.top_n_symbols)
         symbols = symbols_payload["symbols"]
-        self.store.save_raw_snapshot("symbols", symbols_payload, utc_now_iso())
         health_rows.append(
             DataHealth(
                 source_name="coingecko_symbols",
@@ -79,14 +92,25 @@ class SignalService:
             )
         )
 
-        regime = derive_regime_state(
-            yield_curve_slope=context.rates["yield_curve_slope"],
-            event_risk_week=context.macro_events["event_risk_week"],
-            btc_daily_volatility=btc_vol,
+        return MarketSnapshot(
+            context=context,
+            symbols=symbols,
+            btc_volatility=btc_vol,
+            health_rows=health_rows,
+            raw_snapshots=[("symbols", symbols_payload, utc_now_iso())],
         )
-        self.store.save_regime(regime)
 
-        signals = []
+    def _build_signals_for_symbols(
+        self,
+        symbols: list[str],
+        regime: RegimeState,
+        do_short: bool,
+        do_long: bool,
+    ) -> tuple[list[Signal], list[DataHealth]]:
+        """Build short and/or long signals for each symbol."""
+        signals: list[Signal] = []
+        health_rows: list[DataHealth] = []
+
         for symbol in symbols:
             if do_short:
                 short_klines = fetch_binance_klines(symbol, "15m", 120)
@@ -100,6 +124,7 @@ class SignalService:
                 )
                 sig = build_short_signal(symbol, short_klines["candles"], regime.leverage_multiplier)
                 if short_klines["degraded_reason"]:
+                    logger.warning("Degraded short signal for %s: %s", symbol, short_klines["degraded_reason"])
                     sig = _force_degraded(sig, short_klines["degraded_reason"])
                 signals.append(sig)
 
@@ -120,15 +145,53 @@ class SignalService:
                     macro_regime=regime.macro_regime,
                 )
                 if long_klines["degraded_reason"]:
+                    logger.warning("Degraded long signal for %s: %s", symbol, long_klines["degraded_reason"])
                     sig = _force_degraded(sig, long_klines["degraded_reason"])
                 signals.append(sig)
 
-        self.store.insert_signals(signals)
-        self.store.save_data_health(health_rows)
-        if do_short:
-            self.last_short_refresh = self._utc_now()
-        if do_long:
-            self.last_long_refresh = self._utc_now()
+        return signals, health_rows
+
+    def refresh(self, force: bool = False) -> None:
+        short_interval = timedelta(minutes=self.settings.short_refresh_minutes)
+        long_interval = timedelta(hours=self.settings.long_refresh_hours)
+        do_short = force or self._needs_refresh(self.last_short_refresh, short_interval)
+        do_long = force or self._needs_refresh(self.last_long_refresh, long_interval)
+        if not do_short and not do_long:
+            return
+
+        with self._refresh_lock:
+            # Re-check after acquiring lock to avoid redundant work.
+            do_short = force or self._needs_refresh(self.last_short_refresh, short_interval)
+            do_long = force or self._needs_refresh(self.last_long_refresh, long_interval)
+            if not do_short and not do_long:
+                return
+
+            logger.info("Signal refresh started (short=%s, long=%s)", do_short, do_long)
+
+            snapshot = self._fetch_market_data()
+            for name, payload, ts in snapshot.raw_snapshots:
+                self.store.save_raw_snapshot(name, payload, ts)
+
+            regime = derive_regime_state(
+                yield_curve_slope=snapshot.context.rates["yield_curve_slope"],
+                event_risk_week=snapshot.context.macro_events["event_risk_week"],
+                btc_daily_volatility=snapshot.btc_volatility,
+            )
+            self.store.save_regime(regime)
+
+            signals, signal_health = self._build_signals_for_symbols(
+                snapshot.symbols, regime, do_short, do_long,
+            )
+
+            all_health = snapshot.health_rows + signal_health
+            self.store.insert_signals(signals)
+            self.store.save_data_health(all_health)
+
+            if do_short:
+                self.last_short_refresh = self._utc_now()
+            if do_long:
+                self.last_long_refresh = self._utc_now()
+            logger.info("Signal refresh completed, %d signals stored", len(signals))
 
     def latest_signals(self) -> list[dict]:
         self.refresh()
@@ -156,7 +219,7 @@ class SignalService:
         return self.store.latest_data_health()
 
 
-def _force_degraded(signal, reason: str):
+def _force_degraded(signal: Signal, reason: str) -> Signal:
     return type(signal)(
         **{
             **signal.model_dump(),
@@ -172,10 +235,14 @@ def _force_degraded(signal, reason: str):
 
 
 _service_singleton: SignalService | None = None
+_service_lock = threading.Lock()
 
 
 def get_signal_service() -> SignalService:
     global _service_singleton
-    if _service_singleton is None:
-        _service_singleton = SignalService()
+    if _service_singleton is not None:
+        return _service_singleton
+    with _service_lock:
+        if _service_singleton is None:
+            _service_singleton = SignalService()
     return _service_singleton
