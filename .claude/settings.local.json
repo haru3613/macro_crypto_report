@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile:*)",
+      "Bash(grep:*)",
+      "Bash(git -C \"C:\\\\Users\\\\user\\\\Documents\\\\GitHub\\\\macro_crypto_report\" log --oneline --all)",
+      "Bash(python -m pytest:*)",
+      "Bash(pip install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nIntegrate live APIs, placeholder indicators, .env config, and Docker\n\n- Connect 6 free data sources: Binance Futures \\(funding/OI\\), Binance daily\n  \\(CME proxy\\), DefiLlama stablecoins, FRED API \\(CPI/NFP/ISM PMI via\n  FRED_API_KEY\\), static FOMC 2025-2026 calendar; FedWatch stays placeholder\n- Add is_placeholder flag to every data source return dict\n- Add placeholder_sources list to ReportContext; indicators/compute.py\n  collects names of fallback sources automatically\n- Add data source status panel to frontend \\(Live/假資料 badges per source\\)\n- Add ⚠️ badges on KPI values backed by placeholder data\n- Add .env management: python-dotenv auto-loads .env, fred_api_key in\n  Settings, .env.example documents all env vars\n- Add Dockerfile, docker-compose.yml \\(SQLite persisted via volume\\), .dockerignore\n- Add CLAUDE.md with commands, architecture, and data source status table\n- 9-phase refactoring: logging, thread safety, input validation, deduplication,\n  configurable thresholds \\(signals/config.py\\), type safety, decomposed refresh,\n  27-test suite, docstrings\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(python:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nRedesign frontend with Tailwind CSS dark theme and fix AI button bug\n\n- Replace custom CSS with Tailwind CDN: dark slate-950 theme, responsive\n  grid layout, color-coded signal metrics \\(emerald/rose\\), purple AI panel\n- Fix AI bug: split AI section into separate idle/output divs so analysis\n  never appears before button click; resetAiSection\\(\\) on language change;\n  setI18nText\\(\\) skips #ai-advice to prevent accidental overwrites\n- Slim styles.css to 51 lines \\(fade-in animation + dark scrollbar only\\)\n- Migrate AI backend from OpenAI to Gemini API \\(gemini-3.5-pro\\)\n- Fix FRED CSV column detection \\(observation_date vs DATE\\)\n- Add Binance exchangeInfo validation to filter invalid trading pairs\n- Revert ISM PMI to clean placeholder \\(NAPM discontinued from FRED\\)\n- Add /report/weekly/ai endpoint for on-demand AI analysis only\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:docs.polymarket.com)",
+      "WebFetch(domain:gamma-api.polymarket.com)",
+      "WebFetch(domain:clob.polymarket.com)",
+      "WebSearch",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:hypereal.tech)",
+      "WebFetch(domain:www.macromicro.me)",
+      "WebFetch(domain:en.macromicro.me)",
+      "WebFetch(domain:finnhub.io)"
+    ]
+  }
+}

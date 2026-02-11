@@ -27,8 +27,8 @@ def test_generate_ai_advice_gemini_success(monkeypatch):
     advice = generate_ai_advice(
         context,
         "# test",
-        settings=Settings(gemini_api_key="test-key", gemini_model="gemini-2.0-flash"),
+        settings=Settings(gemini_api_key="test-key", gemini_model="gemini-2.5-pro"),
     )
     assert advice["source"] == "gemini"
-    assert advice["model"] == "gemini-2.0-flash"
+    assert advice["model"] == "gemini-2.5-pro"
     assert "Keep risk tight" in advice["analysis_markdown"]

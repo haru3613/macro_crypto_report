@@ -53,6 +53,8 @@ Both use ATR-based entry/stop/TP bands and confidence-based position sizing (3-8
 - `GET /` — Dashboard (static HTML)
 - `GET /report/weekly?lang={en|zh-TW}` — Context + markdown report
 - `GET /report/weekly/advice?lang={en|zh-TW}` — Above + AI advice + signal summary
+- `GET /report/weekly/ai?lang={en|zh-TW}` — AI advice only
+- `GET /report/weekly/fed-chair?lang={en|zh-TW}` — Fed Chair (Powell-style) FOMC dual-mandate policy analysis
 - `GET /signals/latest` — Latest signals for all symbols
 - `GET /signals/{symbol}?limit=40` — Signal history (symbol validated: `^[A-Z0-9]{2,20}$`)
 - `GET /regime/current` — Current macro/vol regime + leverage multiplier
@@ -62,8 +64,8 @@ Both use ATR-based entry/stop/TP bands and confidence-based position sizing (3-8
 | Source | API | Key Required |
 |--------|-----|-------------|
 | Yield curve | FRED CSV (DGS10/DGS2) | No |
-| CPI, NFP | FRED JSON API | FRED_API_KEY |
-| ISM PMI | FRED JSON API (NAPM) | FRED_API_KEY |
+| CPI, NFP | FRED JSON API (with prev values) | FRED_API_KEY |
+| ISM PMI | **Placeholder only** (NAPM discontinued) | — |
 | Symbols | CoinGecko markets | No |
 | Klines | Binance spot | No |
 | Funding/OI | Binance Futures | No |
@@ -71,4 +73,6 @@ Both use ATR-based entry/stop/TP bands and confidence-based position sizing (3-8
 | Stablecoin flows | DefiLlama | No |
 | FOMC schedule | Static 2025-2026 calendar | No |
 | FedWatch | **Placeholder only** (no free API) | — |
+| Polymarket | Gamma API (macro markets) | No |
 | AI advice | Gemini `generateContent` API | GEMINI_API_KEY |
+| Fed Chair agent | Gemini `generateContent` API (fallback: rules-based) | GEMINI_API_KEY |

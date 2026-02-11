@@ -19,6 +19,8 @@ _SOURCE_LABELS = {
     "yield_curve": "Yield Curve",
     "crypto_derivs": "Crypto Derivatives",
     "stablecoin_flows": "Stablecoin Flows",
+    "polymarket": "Polymarket",
+    "consensus": "Finnhub Consensus",
 }
 
 
@@ -59,5 +61,6 @@ def compute_report_context(raw_data: RawReportData) -> ReportContext:
         cme_gap=cme_gap,
         derivatives=derivatives_state,
         stablecoin_flows=raw_data.stablecoin_flows,
+        polymarket_markets=raw_data.polymarket.get("markets", []),
         placeholder_sources=placeholder_sources,
     )

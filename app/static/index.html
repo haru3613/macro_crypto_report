@@ -23,7 +23,7 @@
         },
       };
     </script>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=2" />
   </head>
   <body class="bg-slate-950 text-slate-200 font-sans min-h-screen antialiased">
     <!-- Top accent bar -->
@@ -76,6 +76,95 @@
           <div class="bg-slate-900/70 border border-slate-800/60 rounded-xl p-4">
             <span class="text-xs text-slate-500 block mb-1.5" data-i18n="stablecoin24">穩定幣 24h 淨流</span>
             <strong id="flow-24h" class="text-white font-mono text-sm">-</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Macro Data -->
+      <section class="animate-fade-in" style="animation-delay:0.05s">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3" data-i18n="macroData">宏觀數據</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- CPI + NFP table -->
+          <div class="bg-slate-900/70 border border-slate-800/60 rounded-2xl p-5">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3" data-i18n="econIndicators">經濟指標</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-xs text-slate-500 border-b border-slate-800/50">
+                    <th class="text-left py-2 font-medium" data-i18n="indicator">指標</th>
+                    <th class="text-right py-2 font-medium" data-i18n="actual">實際值</th>
+                    <th class="text-right py-2 font-medium" data-i18n="prev">前值</th>
+                    <th class="text-right py-2 font-medium" data-i18n="expected">預期</th>
+                  </tr>
+                </thead>
+                <tbody class="text-slate-300 font-mono text-xs">
+                  <tr class="border-b border-slate-800/30">
+                    <td class="py-2.5 text-slate-400" data-i18n="cpiHeadline">CPI 整體 YoY</td>
+                    <td id="cpi-headline" class="text-right py-2.5 text-white font-semibold">-</td>
+                    <td id="cpi-headline-prev" class="text-right py-2.5">-</td>
+                    <td id="cpi-headline-exp" class="text-right py-2.5 text-slate-500">-</td>
+                  </tr>
+                  <tr class="border-b border-slate-800/30">
+                    <td class="py-2.5 text-slate-400" data-i18n="cpiCore">CPI 核心 YoY</td>
+                    <td id="cpi-core" class="text-right py-2.5 text-white font-semibold">-</td>
+                    <td id="cpi-core-prev" class="text-right py-2.5">-</td>
+                    <td id="cpi-core-exp" class="text-right py-2.5 text-slate-500">-</td>
+                  </tr>
+                  <tr class="border-b border-slate-800/30">
+                    <td class="py-2.5 text-slate-400" data-i18n="nfpPayroll">NFP 就業人數</td>
+                    <td id="nfp-payroll" class="text-right py-2.5 text-white font-semibold">-</td>
+                    <td id="nfp-payroll-prev" class="text-right py-2.5">-</td>
+                    <td id="nfp-payroll-exp" class="text-right py-2.5 text-slate-500">-</td>
+                  </tr>
+                  <tr class="border-b border-slate-800/30">
+                    <td class="py-2.5 text-slate-400" data-i18n="nfpUnrate">失業率</td>
+                    <td id="nfp-unrate" class="text-right py-2.5 text-white font-semibold">-</td>
+                    <td id="nfp-unrate-prev" class="text-right py-2.5">-</td>
+                    <td class="text-right py-2.5 text-slate-600">—</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 text-slate-400">ISM PMI</td>
+                    <td id="pmi-level" class="text-right py-2.5 text-white font-semibold">-</td>
+                    <td id="pmi-level-prev" class="text-right py-2.5">-</td>
+                    <td id="pmi-level-exp" class="text-right py-2.5 text-slate-500">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex items-center gap-4 mt-3 text-xs text-slate-500">
+              <span><span data-i18n="cpiRelease">CPI 發布日</span>: <span id="cpi-release" class="font-mono">-</span></span>
+              <span><span data-i18n="nfpRelease">NFP 發布日</span>: <span id="nfp-release" class="font-mono">-</span></span>
+            </div>
+          </div>
+          <!-- FOMC + Events -->
+          <div class="bg-slate-900/70 border border-slate-800/60 rounded-2xl p-5 flex flex-col gap-4">
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3" data-i18n="fedSchedule">Fed 行事曆</h3>
+              <div class="space-y-0">
+                <div class="flex justify-between items-center py-2.5 border-b border-slate-800/50">
+                  <span class="text-sm text-slate-400" data-i18n="nextFomc">下次 FOMC</span>
+                  <strong id="fomc-next" class="font-mono text-white text-sm">-</strong>
+                </div>
+                <div class="flex justify-between items-center py-2.5 border-b border-slate-800/50">
+                  <span class="text-sm text-slate-400" data-i18n="pmiState">ISM PMI 狀態</span>
+                  <strong id="pmi-state" class="font-mono text-sm">-</strong>
+                </div>
+                <div class="flex justify-between items-center py-2.5">
+                  <span class="text-sm text-slate-400" data-i18n="stablecoin7d">穩定幣 7d 淨流</span>
+                  <strong id="flow-7d" class="font-mono text-white text-sm">-</strong>
+                </div>
+              </div>
+            </div>
+            <!-- Polymarket -->
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                <span data-i18n="polymarketTitle">預測市場</span>
+                <span class="text-xs font-normal text-slate-600 ml-1" data-i18n="polymarketTag">(市場定價，非官方)</span>
+              </h3>
+              <div id="polymarket-table" class="overflow-x-auto">
+                <p class="text-xs text-slate-600">Loading...</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -189,6 +278,34 @@
         </div>
       </section>
 
+      <!-- Fed Chair Analysis -->
+      <section class="bg-blue-950/20 border border-blue-500/20 rounded-2xl p-5 animate-fade-in" style="animation-delay:0.28s">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-blue-300" data-i18n="fedChairTitle">Fed Chair 政策分析</h2>
+          <div class="flex items-center gap-4">
+            <button id="fed-chair-btn" class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors whitespace-nowrap" data-i18n="fedChairStart">開始 Fed Chair 分析</button>
+            <span class="text-xs text-slate-500 hidden sm:inline">
+              <span data-i18n="hawkScore">鷹派評分</span>: <span id="fed-hawk-score">-</span>/10
+              <span class="mx-2 text-slate-700">|</span>
+              <span data-i18n="source">來源</span>: <span id="fed-source">-</span>
+            </span>
+          </div>
+        </div>
+        <!-- Idle state -->
+        <div id="fed-chair-idle" class="flex flex-col items-center justify-center py-12 text-slate-600">
+          <svg class="w-10 h-10 mb-3 text-blue-500/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z"/></svg>
+          <p class="text-sm" data-i18n="fedChairIdle">點擊上方按鈕啟動 FOMC 雙重使命政策分析</p>
+        </div>
+        <!-- Output state -->
+        <div id="fed-chair-output" class="hidden">
+          <pre id="fed-chair-advice" class="bg-slate-950/60 rounded-lg p-4 font-mono text-xs leading-relaxed text-slate-300 overflow-auto max-h-[32rem] scrollbar-thin"></pre>
+          <div class="flex items-center gap-4 mt-3 sm:hidden text-xs text-slate-500">
+            <span><span data-i18n="hawkScore">鷹派評分</span>: <span id="fed-hawk-score-mobile">-</span>/10</span>
+            <span><span data-i18n="source">來源</span>: <span id="fed-source-mobile">-</span></span>
+          </div>
+        </div>
+      </section>
+
       <!-- Data Source Status -->
       <section class="bg-slate-900/70 border border-slate-800/60 rounded-2xl p-5 animate-fade-in" style="animation-delay:0.3s">
         <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4" data-i18n="sourceStatusTitle">資料來源狀態</h2>
@@ -202,6 +319,6 @@
       <p id="status" class="text-sm text-emerald-400/80 font-mono">Loading...</p>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2"></script>
   </body>
 </html>

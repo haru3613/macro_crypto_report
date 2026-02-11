@@ -11,9 +11,11 @@ REPORT_TEMPLATE_EN = """# Macro + Crypto Weekly Brief
 - Stablecoin exchange net flow (24h): {stablecoin_24h:,}
 
 ## Macro
-- CPI release: {cpi_release}
-- NFP release: {nfp_release}
-- ISM Services PMI: {pmi_level} ({pmi_state})
+- CPI Headline YoY: {cpi_headline_yoy:.1f}% | Prev {cpi_headline_yoy_prev:.1f}% | Expected {cpi_headline_expected} (Released: {cpi_release})
+- CPI Core YoY:    {cpi_core_yoy:.1f}% | Prev {cpi_core_yoy_prev:.1f}% | Expected {cpi_core_expected}
+- NFP Payrolls: {nfp_payroll_change:+,} | Prev {nfp_payroll_change_prev:+,} | Expected {nfp_payroll_expected} (Released: {nfp_release})
+- Unemployment: {nfp_unemployment_rate:.1f}% | Prev {nfp_unemployment_rate_prev:.1f}%
+- ISM Services PMI: {pmi_level} | Prev {pmi_level_prev} | Expected {pmi_expected} ({pmi_state})
 - Next FOMC meeting: {fomc_meeting}
 
 ## Rates
@@ -35,6 +37,9 @@ REPORT_TEMPLATE_EN = """# Macro + Crypto Weekly Brief
 ## CME Gap
 - Status: {gap_status}
 - Gap size: {gap_value:,}
+
+## Prediction Markets *(market-derived, non-official)*
+{polymarket_section}
 """
 
 REPORT_TEMPLATE_ZH = """# 宏觀 + 加密 週報摘要
@@ -48,9 +53,11 @@ REPORT_TEMPLATE_ZH = """# 宏觀 + 加密 週報摘要
 - 穩定幣交易所 24h 淨流：{stablecoin_24h:,}
 
 ## 宏觀
-- CPI 發布日：{cpi_release}
-- NFP 發布日：{nfp_release}
-- ISM 服務業 PMI：{pmi_level}（{pmi_state}）
+- CPI 整體年增：{cpi_headline_yoy:.1f}% | 前值 {cpi_headline_yoy_prev:.1f}% | 預期 {cpi_headline_expected}（發布日：{cpi_release}）
+- CPI 核心年增：{cpi_core_yoy:.1f}% | 前值 {cpi_core_yoy_prev:.1f}% | 預期 {cpi_core_expected}
+- NFP 就業人數：{nfp_payroll_change:+,} | 前值 {nfp_payroll_change_prev:+,} | 預期 {nfp_payroll_expected}（發布日：{nfp_release}）
+- 失業率：{nfp_unemployment_rate:.1f}% | 前值 {nfp_unemployment_rate_prev:.1f}%
+- ISM 服務業 PMI：{pmi_level} | 前值 {pmi_level_prev} | 預期 {pmi_expected}（{pmi_state}）
 - 下次 FOMC 會議：{fomc_meeting}
 
 ## 利率
@@ -72,6 +79,9 @@ REPORT_TEMPLATE_ZH = """# 宏觀 + 加密 週報摘要
 ## CME 缺口
 - 狀態：{gap_status}
 - 缺口大小：{gap_value:,}
+
+## 預測市場 *（市場定價，非官方）*
+{polymarket_section}
 """
 
 

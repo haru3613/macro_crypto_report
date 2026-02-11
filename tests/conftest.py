@@ -24,14 +24,32 @@ class FakeResponse:
         return False
 
 
-def make_sample_context(**overrides) -> ReportContext:
-    """Build a ReportContext with sensible test defaults."""
+def make_sample_context(macro_events_overrides: dict | None = None, **overrides) -> ReportContext:
+    """Build a ReportContext with sensible test defaults.
+
+    Args:
+        macro_events_overrides: Partial overrides merged into the default macro_events dict.
+        **overrides: Top-level ReportContext field overrides (replace entire field).
+    """
     kwargs = {
         "as_of": "2026-02-09",
         "macro_events": {
             "cpi_release": "2026-02-13",
+            "cpi_headline_yoy": 3.1,
+            "cpi_headline_yoy_prev": 2.9,
+            "cpi_headline_yoy_expected": None,
+            "cpi_core_yoy": 3.3,
+            "cpi_core_yoy_prev": 3.2,
+            "cpi_core_yoy_expected": None,
             "nfp_release": "2026-02-07",
+            "nfp_payroll_change": 165_000,
+            "nfp_payroll_change_prev": 220_000,
+            "nfp_payroll_change_expected": None,
+            "nfp_unemployment_rate": 3.8,
+            "nfp_unemployment_rate_prev": 4.0,
             "pmi_level": 52.4,
+            "pmi_level_prev": 54.1,
+            "pmi_level_expected": None,
             "pmi_state": "expansion",
             "fomc_next_meeting": "2026-03-18",
             "event_risk_week": True,
@@ -47,7 +65,18 @@ def make_sample_context(**overrides) -> ReportContext:
             "open_interest_state": "stable",
         },
         "stablecoin_flows": {"net_flow_24h": -250_000_000, "net_flow_7d": 1_200_000_000},
+        "polymarket_markets": [
+            {
+                "question": "Will the Fed cut rates at the March 2026 FOMC meeting?",
+                "outcomes": {"Yes": 0.25, "No": 0.75},
+                "volume_usd": 120_000,
+                "end_date": "2026-03-19",
+                "slug": "test-fomc-cut",
+            },
+        ],
     }
+    if macro_events_overrides:
+        kwargs["macro_events"] = {**kwargs["macro_events"], **macro_events_overrides}
     kwargs.update(overrides)
     return ReportContext(**kwargs)
 

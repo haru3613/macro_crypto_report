@@ -2,157 +2,165 @@
 
 import json
 import logging
+import time
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
-logger = logging.getLogger(__name__)
+from typing import Dict, Any, Optional
 
 from app.config import Settings, get_settings
 from report.schema import ReportContext
 
-SYSTEM_PROMPT_EN = """You are a macro+crypto risk analyst.
-Given a structured report context and markdown brief, return a concise analysis with:
-1) Market regime
-2) Top risks this week
-3) Actionable trade/risk-management suggestions
-4) Invalid setup / what to avoid
-Keep recommendations specific, practical, and risk-aware.
-Use markdown with short bullet points.
+logger = logging.getLogger(__name__)
+
+# --- Prompts ---
+
+SYSTEM_PROMPT_EN = """
+Role: Macro & Crypto Risk Analyst.
+Task: Analyze the provided Report Context (JSON) and Market Brief (Markdown) to generate a strategic summary.
+
+Output Requirements:
+1. **Market Regime**: Define the current state (e.g., Risk-On, Risk-Off, PVP, Chop).
+2. **Top Risks**: Identify specific immediate risks (funding heat, macro events, liquidity).
+3. **Actionable Suggestions**: Concrete execution or risk management steps.
+4. **Invalidation/Avoid**: specific setups to ignore or conditions that invalidate the thesis.
+
+Format: Markdown, concise bullet points. No conversational filler.
 """
 
-SYSTEM_PROMPT_ZH = """你是宏觀與加密市場風險分析師。
-請根據結構化 report context 與週報內容，輸出精簡分析，包含：
-1) 當前市場型態
-2) 本週核心風險
-3) 可執行的交易/風控建議
-4) 無效情境與應避免行為
-請使用繁體中文與 markdown 短條列。
+SYSTEM_PROMPT_ZH = """
+角色：宏觀與加密貨幣市場風險分析師。
+任務：根據提供的結構化數據 (Report Context) 與市場簡報 (Markdown Brief) 生成策略摘要。
+
+輸出要求：
+1. **當前市場型態**：定義目前狀態（如：風險偏好上升、風險趨避、存量博弈、震盪洗盤）。
+2. **本週核心風險**：具體的即時風險（如：費率過熱、宏觀事件、流動性缺失）。
+3. **可執行的建議**：具體的交易或風控操作步驟。
+4. **無效情境/應避免**：需要避開的無效交易結構或會推翻邏輯的條件。
+
+格式：繁體中文 (Traditional Chinese)，Markdown 短條列，風格專業精簡。
 """
 
+# Using v1beta to access latest features
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
-
 def _system_prompt(lang: str) -> str:
-    if lang.lower().startswith("zh"):
-        return SYSTEM_PROMPT_ZH
-    return SYSTEM_PROMPT_EN
-
+    return SYSTEM_PROMPT_ZH if lang.lower().startswith("zh") else SYSTEM_PROMPT_EN
 
 def _extract_gemini_text(payload: dict) -> str:
-    """Extract text from Gemini API response."""
+    """Extract text or log the specific blockage reason."""
+    
+    # 1. Check Top-Level Prompt Blocking (e.g. Copyright/Hard Safety)
+    prompt_feedback = payload.get("promptFeedback", {})
+    if prompt_feedback.get("blockReason"):
+        logger.error(f"Gemini Prompt Blocked. Reason: {prompt_feedback['blockReason']}")
+        return ""
+
     candidates = payload.get("candidates", [])
     if not candidates:
+        # If no candidates exist, dump the whole payload to see what happened
+        logger.error(f"Gemini: No candidates returned. Raw payload: {json.dumps(payload)}")
         return ""
-    content = candidates[0].get("content", {})
+
+    candidate = candidates[0]
+    
+    # 2. Check Candidate Safety Blocking
+    # finishReason can be: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER
+    finish_reason = candidate.get("finishReason")
+    
+    if finish_reason == "SAFETY":
+        safety_ratings = candidate.get("safetyRatings", [])
+        # Log which category triggered the block
+        triggered = [
+            f"{r['category']}={r['probability']}" 
+            for r in safety_ratings 
+            if r.get("probability") not in ["NEGLIGIBLE", "LOW"]
+        ]
+        logger.error(f"Gemini Safety Block. Triggers: {', '.join(triggered)}")
+        return ""
+        
+    if finish_reason not in ["STOP", "MAX_TOKENS", None]:
+        logger.warning(f"Gemini stopped unusually. Reason: {finish_reason}")
+
+    # 3. Extract Text
+    content = candidate.get("content", {})
     parts = content.get("parts", [])
     texts = [p.get("text", "") for p in parts if p.get("text")]
+    
     return "\n".join(texts).strip()
 
-
 def _fallback_advice(context: ReportContext, lang: str = "en") -> str:
+    """Deterministic rule-based advice when AI is unavailable."""
     curve_slope = context.rates["yield_curve_slope"]
     funding_state = context.derivatives["funding_state"]
     oi_state = context.derivatives["open_interest_state"]
     stablecoin_24h = context.stablecoin_flows["net_flow_24h"]
     event_risk = context.macro_events.get("event_risk_week", False)
 
-    regime = "mixed"
-    if curve_slope < 0 and stablecoin_24h < 0:
-        regime = "risk-off bias"
+    # Simple regime logic
+    regime = "Mixed / Chop"
+    if curve_slope < -0.5 and stablecoin_24h < -10000000: # Example thresholds
+        regime = "Risk-Off Bias"
     elif funding_state == "overheated" and oi_state == "expanding":
-        regime = "late risk-on with crowding"
+        regime = "Late Risk-On (Crowded)"
     elif stablecoin_24h > 0 and oi_state in {"stable", "expanding"}:
-        regime = "cautious risk-on"
+        regime = "Cautious Risk-On"
 
-    risk_items = []
+    is_zh = lang.lower().startswith("zh")
+
+    # Mapping for translation
+    text_map = {
+        "regime_label": "市場型態" if is_zh else "Market Regime",
+        "risks_label": "核心風險" if is_zh else "Top Risks",
+        "suggestions_label": "建議" if is_zh else "Suggestions",
+        "avoid_label": "應避免" if is_zh else "Avoid",
+        "fallback_title": "AI 分析 (Fallback)" if is_zh else "AI Analysis (Fallback)",
+    }
+
+    # Dynamic List Generation
+    risks = []
     if event_risk:
-        risk_items.append("Macro event risk is elevated around CPI/NFP/FOMC timing.")
+        risks.append("宏觀事件風險偏高 (CPI/FOMC/NFP)" if is_zh else "Elevated macro event risk (CPI/FOMC/NFP).")
     if funding_state == "overheated":
-        risk_items.append("Funding is overheated; long squeeze probability is higher.")
+        risks.append("費率過熱，多頭擠壓風險高" if is_zh else "Funding overheated; high long-squeeze probability.")
     if oi_state == "deleveraging":
-        risk_items.append("Open interest is deleveraging; trend continuation can weaken.")
-    if curve_slope < 0:
-        risk_items.append("Yield curve remains inverted; medium-term macro fragility persists.")
-    if stablecoin_24h < 0:
-        risk_items.append("Stablecoin net outflow suggests weaker immediate crypto demand.")
-    if not risk_items:
-        risk_items.append("No single extreme signal, but cross-asset confirmation is limited.")
+        risks.append("OI 正在去槓桿，趨勢可能轉弱" if is_zh else "OI deleveraging; trend continuation weakening.")
+    if not risks:
+        risks.append("市場缺乏明確方向性訊號" if is_zh else "No single extreme signal; low conviction environment.")
 
     actions = [
-        "Keep position sizing smaller during event windows; avoid adding leverage pre-release.",
-        "Prefer confirmation entries after data prints instead of predicting binary outcomes.",
-        "Use invalidation levels and hard stops; avoid averaging down into high-volatility moves.",
+        "縮小部位，等待事件落地" if is_zh else "Reduce sizing ahead of events.",
+        "嚴格設定失效價，避免抗單" if is_zh else "Use hard stops; do not average down.",
     ]
-    if funding_state == "overheated":
-        actions.append("Consider reducing long exposure or using partial hedge when basis is crowded.")
-    if stablecoin_24h < 0:
-        actions.append("Require stronger spot/volume confirmation before risk-on entries.")
-
+    
     avoid = [
-        "Do not run oversized leverage ahead of CPI/NFP outcomes.",
-        "Do not treat one metric (only funding or only OI) as a full directional signal.",
+        "避免在資料發布前重倉押注" if is_zh else "Do not pre-position heavily before data prints."
     ]
 
-    if lang.lower().startswith("zh"):
-        regime_map = {
-            "risk-off bias": "偏風險趨避",
-            "late risk-on with crowding": "偏風險偏好但擁擠",
-            "cautious risk-on": "謹慎風險偏好",
-            "mixed": "混合盤",
-        }
-        risk_items_zh = [
-            "CPI/NFP/FOMC 時窗的宏觀事件風險偏高。" if event_risk else None,
-            "Funding 過熱，發生 long squeeze 的機率提高。" if funding_state == "overheated" else None,
-            "OI 去槓桿中，趨勢延續力可能下降。" if oi_state == "deleveraging" else None,
-            "殖利率曲線仍倒掛，中期宏觀脆弱性仍在。" if curve_slope < 0 else None,
-            "穩定幣淨流出，短線需求偏弱。" if stablecoin_24h < 0 else None,
-        ]
-        risk_rows = [item for item in risk_items_zh if item]
-        if not risk_rows:
-            risk_rows = ["未見單一極端訊號，但跨資產確認仍有限。"]
-        action_rows = [
-            "事件公布前縮小部位與槓桿，不預判二元結果。",
-            "優先等待資料公布後的確認訊號再進場。",
-            "採用明確失效價與硬停損，避免高波動下攤平。",
-        ]
-        if funding_state == "overheated":
-            action_rows.append("基差擁擠時考慮降長倉或用部分對沖。")
-        if stablecoin_24h < 0:
-            action_rows.append("風險偏好進場前，先要求更強的現貨/量能確認。")
-        avoid_rows = [
-            "避免在 CPI/NFP 前使用過大槓桿。",
-            "避免只看單一指標（例如只看 Funding 或只看 OI）就做方向判斷。",
-        ]
-        return (
-            f"## AI 分析（Fallback）\n"
-            f"- 市場型態：**{regime_map.get(regime, regime)}**\n\n"
-            f"## 核心風險\n"
-            + "\n".join(f"- {item}" for item in risk_rows)
-            + "\n\n## 建議\n"
-            + "\n".join(f"- {item}" for item in action_rows)
-            + "\n\n## 應避免\n"
-            + "\n".join(f"- {item}" for item in avoid_rows)
-        )
-
+    # Construct Markdown
     return (
-        f"## AI Analysis (Fallback)\n"
-        f"- Regime: **{regime}**\n\n"
-        f"## Top Risks\n"
-        + "\n".join(f"- {item}" for item in risk_items)
-        + "\n\n## Suggestions\n"
-        + "\n".join(f"- {item}" for item in actions)
-        + "\n\n## Avoid\n"
-        + "\n".join(f"- {item}" for item in avoid)
+        f"## {text_map['fallback_title']}\n"
+        f"- {text_map['regime_label']}: **{regime}**\n\n"
+        f"## {text_map['risks_label']}\n"
+        + "\n".join(f"- {r}" for r in risks)
+        + f"\n\n## {text_map['suggestions_label']}\n"
+        + "\n".join(f"- {a}" for a in actions)
+        + f"\n\n## {text_map['avoid_label']}\n"
+        + "\n".join(f"- {a}" for a in avoid)
     )
-
 
 def generate_ai_advice(
     context: ReportContext,
     report_markdown: str,
     lang: str = "en",
-    settings: Settings | None = None,
-) -> dict:
+    settings: Optional[Settings] = None,
+) -> Dict[str, Any]:
+    """
+    Orchestrates the API call to Gemini.
+    """
     settings = settings or get_settings()
+    
+    # 1. Validation
     if not settings.gemini_api_key:
         return {
             "analysis_markdown": _fallback_advice(context, lang=lang),
@@ -160,9 +168,29 @@ def generate_ai_advice(
             "model": "none",
         }
 
-    url = GEMINI_API_URL.format(model=settings.gemini_model) + "?" + urlencode({
-        "key": settings.gemini_api_key,
-    })
+    # 2. Prepare Context & Payload
+    model_name = settings.gemini_model or "gemini-2.0-flash" # Default to a fast model if config missing
+    
+    # Construct URL
+    url = GEMINI_API_URL.format(model=model_name) + "?" + urlencode({"key": settings.gemini_api_key})
+
+    # Prepare input text
+    # ensure_ascii=False is crucial for saving tokens and handling Chinese characters correctly
+    context_str = json.dumps(context.model_dump(), ensure_ascii=False, indent=2)
+    
+    user_prompt = (
+        f"Language: {lang}\n\n"
+        f"### Quantitative Context (JSON)\n{context_str}\n\n"
+        f"### Market Brief (Markdown)\n{report_markdown}"
+    )
+
+    # Disable safety filters for financial context (often triggers 'Financial Advice' or 'Gambling' filters falsely)
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
 
     request_body = {
         "system_instruction": {
@@ -173,22 +201,24 @@ def generate_ai_advice(
                 "parts": [
                     {
                         "text": (
-                            f"Language preference: {lang}\n\n"
-                            "Structured context JSON:\n"
-                            f"{json.dumps(context.model_dump(), ensure_ascii=True)}\n\n"
-                            "Markdown brief:\n"
-                            f"{report_markdown}"
-                        ),
+                            f"Language preference: {lang}\n"
+                            f"Context JSON: {json.dumps(context.model_dump(), ensure_ascii=False)}\n"
+                            f"Report: {report_markdown}"
+                        )
                     }
                 ],
             }
         ],
+        # INSERT SAFETY SETTINGS HERE
+        "safetySettings": safety_settings,
         "generationConfig": {
             "temperature": 0.2,
             "maxOutputTokens": 800,
         },
     }
 
+    # 3. Execute Request
+    start_time = time.perf_counter()
     try:
         req = Request(
             url,
@@ -196,21 +226,40 @@ def generate_ai_advice(
             method="POST",
             headers={"Content-Type": "application/json"},
         )
-        with urlopen(req, timeout=30) as response:
+        
+        with urlopen(req, timeout=15) as response:
             payload = json.loads(response.read().decode("utf-8"))
+            
         text = _extract_gemini_text(payload)
+        
         if not text:
+            logger.warning("Gemini returned empty text but 200 OK.")
             raise ValueError("Empty model response")
+
         return {
             "analysis_markdown": text,
             "source": "gemini",
-            "model": settings.gemini_model,
+            "model": model_name,
+            "latency_ms": int((time.perf_counter() - start_time) * 1000),
         }
-    except Exception as exc:
-        logger.error("Gemini API call failed, falling back to rules: %s", exc)
+
+    except HTTPError as e:
+        # Attempt to read error body for better debugging
+        error_body = e.read().decode('utf-8') if e.fp else "No details"
+        logger.error(f"Gemini API HTTP {e.code}: {e.reason} | Body: {error_body}")
+        
         return {
             "analysis_markdown": _fallback_advice(context, lang=lang),
             "source": "fallback_rules",
-            "model": settings.gemini_model,
+            "model": model_name,
+            "error": f"HTTP {e.code}: {e.reason}",
+        }
+        
+    except (URLError, Exception) as exc:
+        logger.error(f"Gemini API connection failed: {exc}")
+        return {
+            "analysis_markdown": _fallback_advice(context, lang=lang),
+            "source": "fallback_rules",
+            "model": model_name,
             "error": str(exc),
         }

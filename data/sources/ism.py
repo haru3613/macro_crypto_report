@@ -12,6 +12,8 @@ def fetch_ism_services_pmi() -> dict:
     return {
         "period": "2026-01",
         "headline": 52.4,
+        "headline_prev": 54.1,
+        "headline_expected": None,
         "release_date": date(2026, 2, 3).isoformat(),
         "source": "ISM (placeholder)",
         "is_placeholder": True,
