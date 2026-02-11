@@ -308,8 +308,7 @@ CPI 整體年增 {headline:.1f}%（前值 {headline_prev:.1f}%），距 2% PCE �
 
 ## 4. 溝通風險
 FedWatch 定價（市場定價，非官方）顯示：降息機率 {prob_cut:.0%} / 維持 {prob_hold:.0%} / 升息 {prob_hike:.0%}。\
-{'市場預期降息與 FOMC 目前「數據依賴」措辭存在落差，若後續 CPI 意外偏高，可能引發利率市場重新定價。' if prob_cut > 0.3 else \
-'市場定價與 Fed 偏中性立場大致吻合，溝通風險偏低；但若就業數據顯著惡化，鴿派轉向速度可能快於點陣圖暗示。'}
+{'市場預期降息與 FOMC 目前「數據依賴」措辭存在落差，若後續 CPI 意外偏高，可能引發利率市場重新定價。' if prob_cut > 0.3 else '市場定價與 Fed 偏中性立場大致吻合，溝通風險偏低；但若就業數據顯著惡化，鴿派轉向速度可能快於點陣圖暗示。'}
 殖利率曲線目前{'倒掛' if curve_slope < 0 else '轉正'}（{curve_slope:+.2f}%），\
 {'顯示市場預期未來政策寬鬆，但 Fed 尚未給出明確訊號。' if curve_slope < 0 else '金融條件邊際改善。'}
 
@@ -360,8 +359,7 @@ Dual-mandate signals {'both point to maintaining restrictive rates' if score >= 
 
 ## 4. Communication Risk
 FedWatch pricing (market-derived, non-official): Cut {prob_cut:.0%} / Hold {prob_hold:.0%} / Hike {prob_hike:.0%}. \
-{'Market is pricing meaningful cut probability against FOMC\'s "data-dependent" language—a CPI upside surprise could force rapid repricing.' if prob_cut > 0.3 else \
-'Market pricing broadly aligned with a neutral Fed posture; risk is a faster-than-expected dovish pivot if labour data deteriorates sharply.'} \
+{'Market is pricing meaningful cut probability against FOMC’s "data-dependent" language—a CPI upside surprise could force rapid repricing.' if prob_cut > 0.3 else 'Market pricing broadly aligned with a neutral Fed posture; risk is a faster-than-expected dovish pivot if labour data deteriorates sharply.'} \
 Yield curve currently {"inverted" if curve_slope < 0 else "positive"} ({curve_slope:+.2f}%), \
 {"suggesting markets anticipate easing ahead of any explicit Fed signal." if curve_slope < 0 else "a marginal improvement in financial conditions."}
 

@@ -63,11 +63,11 @@ Dashboard now includes a language switcher (Traditional Chinese / English) and d
 Set environment variables if you want model-generated advice:
 
 ```powershell
-$env:OPENAI_API_KEY="your_api_key"
-$env:OPENAI_MODEL="gpt-4.1-mini"
+$env:GEMINI_API_KEY="your_api_key"
+$env:GEMINI_MODEL="gemini-2.0-flash"
 ```
 
-If `OPENAI_API_KEY` is missing or request fails, the service returns rule-based fallback advice.
+If `GEMINI_API_KEY` is missing or request fails, the service returns rule-based fallback advice.
 
 ## Optional Runtime Configuration
 
