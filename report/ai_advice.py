@@ -47,47 +47,44 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model
 def _system_prompt(lang: str) -> str:
     return SYSTEM_PROMPT_ZH if lang.lower().startswith("zh") else SYSTEM_PROMPT_EN
 
-def _extract_gemini_text(payload: dict) -> str:
-    """Extract text or log the specific blockage reason."""
-    
-    # 1. Check Top-Level Prompt Blocking (e.g. Copyright/Hard Safety)
+def _extract_gemini_text(payload: dict) -> tuple[str, str]:
+    """Extract text and return (text, diagnostics)."""
+
     prompt_feedback = payload.get("promptFeedback", {})
     if prompt_feedback.get("blockReason"):
-        logger.error(f"Gemini Prompt Blocked. Reason: {prompt_feedback['blockReason']}")
-        return ""
+        reason = f"prompt_blocked:{prompt_feedback.get('blockReason')}"
+        logger.error("Gemini Prompt Blocked. Reason: %s", prompt_feedback.get("blockReason"))
+        return "", reason
 
     candidates = payload.get("candidates", [])
     if not candidates:
-        # If no candidates exist, dump the whole payload to see what happened
-        logger.error(f"Gemini: No candidates returned. Raw payload: {json.dumps(payload)}")
-        return ""
+        logger.error("Gemini: No candidates returned. Raw payload: %s", json.dumps(payload))
+        return "", "no_candidates"
 
-    candidate = candidates[0]
-    
-    # 2. Check Candidate Safety Blocking
-    # finishReason can be: STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER
-    finish_reason = candidate.get("finishReason")
-    
-    if finish_reason == "SAFETY":
-        safety_ratings = candidate.get("safetyRatings", [])
-        # Log which category triggered the block
-        triggered = [
-            f"{r['category']}={r['probability']}" 
-            for r in safety_ratings 
-            if r.get("probability") not in ["NEGLIGIBLE", "LOW"]
-        ]
-        logger.error(f"Gemini Safety Block. Triggers: {', '.join(triggered)}")
-        return ""
-        
-    if finish_reason not in ["STOP", "MAX_TOKENS", None]:
-        logger.warning(f"Gemini stopped unusually. Reason: {finish_reason}")
+    for idx, candidate in enumerate(candidates):
+        finish_reason = candidate.get("finishReason")
 
-    # 3. Extract Text
-    content = candidate.get("content", {})
-    parts = content.get("parts", [])
-    texts = [p.get("text", "") for p in parts if p.get("text")]
-    
-    return "\n".join(texts).strip()
+        if finish_reason == "SAFETY":
+            safety_ratings = candidate.get("safetyRatings", [])
+            triggered = [
+                f"{r.get('category', 'unknown')}={r.get('probability', 'unknown')}"
+                for r in safety_ratings
+                if r.get("probability") not in ["NEGLIGIBLE", "LOW"]
+            ]
+            logger.error("Gemini Safety Block. Triggers: %s", ", ".join(triggered))
+            continue
+
+        if finish_reason not in ["STOP", "MAX_TOKENS", None]:
+            logger.warning("Gemini stopped unusually. Reason: %s", finish_reason)
+
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        texts = [part.get("text", "") for part in parts if part.get("text")]
+        text = "\n".join(texts).strip()
+        if text:
+            return text, f"candidate_{idx}:{finish_reason or 'none'}"
+
+    return "", "empty_text_in_all_candidates"
 
 def _fallback_advice(context: ReportContext, lang: str = "en") -> str:
     """Deterministic rule-based advice when AI is unavailable."""
@@ -169,7 +166,7 @@ def generate_ai_advice(
         }
 
     # 2. Prepare Context & Payload
-    model_name = settings.gemini_model or "gemini-2.0-flash" # Default to a fast model if config missing
+    model_name = (settings.gemini_model or "gemini-2.0-flash").strip()
     
     # Construct URL
     url = GEMINI_API_URL.format(model=model_name) + "?" + urlencode({"key": settings.gemini_api_key})
@@ -227,14 +224,14 @@ def generate_ai_advice(
             headers={"Content-Type": "application/json"},
         )
         
-        with urlopen(req, timeout=15) as response:
+        with urlopen(req, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
             
-        text = _extract_gemini_text(payload)
-        
+        text, diagnostics = _extract_gemini_text(payload)
+
         if not text:
-            logger.warning("Gemini returned empty text but 200 OK.")
-            raise ValueError("Empty model response")
+            logger.warning("Gemini returned empty text but 200 OK. diagnostics=%s", diagnostics)
+            raise ValueError(f"Empty model response ({diagnostics})")
 
         return {
             "analysis_markdown": text,

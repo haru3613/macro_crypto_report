@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from datetime import date, timedelta
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -24,8 +25,8 @@ _REQUEST_TIMEOUT = 12
 #   - event_name_keywords: ALL must appear in the event name (case-insensitive)
 #   - unit_multiplier: multiply the estimate by this to match our internal unit
 _MATCH_RULES: list[tuple[str, list[str], float]] = [
-    ("cpi_headline_yoy_expected", ["cpi", "yoy"],                    1.0),
     ("cpi_core_yoy_expected",     ["core", "cpi", "yoy"],            1.0),
+    ("cpi_headline_yoy_expected", ["cpi", "yoy"],                    1.0),
     ("nfp_payroll_change_expected", ["nonfarm payrolls"],             1_000),  # Finnhub: K → we use raw
     ("pmi_level_expected",        ["ism", "non-manufacturing", "pmi"], 1.0),
 ]
@@ -36,13 +37,14 @@ _FALLBACK_RULES: list[tuple[str, list[str], float]] = [
     ("nfp_payroll_change_expected", ["employment change"],            1_000),
     ("pmi_level_expected",          ["ism", "services"],              1.0),
     ("pmi_level_expected",          ["ism", "pmi"],                   1.0),
-    ("cpi_headline_yoy_expected",   ["consumer price", "yoy"],       1.0),
     ("cpi_core_yoy_expected",       ["core", "consumer price", "yoy"], 1.0),
+    ("cpi_headline_yoy_expected",   ["consumer price", "yoy"],       1.0),
 ]
 
 
 def _finnhub_api_key() -> str:
-    return os.getenv("FINNHUB_API_KEY", "")
+    # Accept both names for compatibility with different deployment conventions.
+    return (os.getenv("FINNHUB_API_KEY") or os.getenv("FINNHUB_TOKEN") or "").strip()
 
 
 def _match_event(event_name: str, rules: list[tuple[str, list[str], float]]) -> tuple[str, float] | None:
@@ -80,9 +82,11 @@ def fetch_economic_consensus() -> dict:
         from_date = (today - timedelta(days=45)).isoformat()
         to_date = (today + timedelta(days=30)).isoformat()
 
-        params = {"from": from_date, "to": to_date}
+        # Finnhub auth is query-param based in official docs (`token=...`).
+        params = {"from": from_date, "to": to_date, "token": api_key}
         url = f"{_FINNHUB_BASE}?{urlencode(params)}"
         req = Request(url, headers={
+            "Authorization": f"Bearer {api_key}",
             "X-Finnhub-Token": api_key,
             "User-Agent": "macro-crypto-report/1.0",
         })
@@ -145,6 +149,12 @@ def fetch_economic_consensus() -> dict:
             "raw_events": matched_events,
         }
 
+    except HTTPError as exc:
+        hint = ""
+        if exc.code == 401:
+            hint = " (check FINNHUB_API_KEY/FINNHUB_TOKEN value and plan entitlements)"
+        logger.warning("Finnhub calendar fetch failed: HTTP %s %s%s", exc.code, exc.reason, hint)
+        return _empty_consensus(placeholder=True)
     except Exception as exc:
         logger.warning("Finnhub calendar fetch failed: %s", exc)
         return _empty_consensus(placeholder=True)
