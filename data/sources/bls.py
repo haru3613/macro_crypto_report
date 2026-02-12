@@ -34,6 +34,40 @@ def _fetch_fred_series(series_id: str, limit: int = 2) -> list[dict]:
     return data.get("observations", [])
 
 
+def _estimate_us_cpi_release_date(period_date: str) -> str:
+    """Estimate CPI release date as 2nd Tuesday of following month.
+
+    FRED CPI series date is the reference month (e.g. 2025-12-01), not BLS
+    release timestamp. We convert to an estimated publication date used for
+    report display.
+    """
+    year, month, _ = map(int, period_date.split("-"))
+    rel_year = year + 1 if month == 12 else year
+    rel_month = 1 if month == 12 else month + 1
+
+    first = date(rel_year, rel_month, 1)
+    days_to_tuesday = (1 - first.weekday()) % 7  # Monday=0, Tuesday=1
+    first_tuesday = 1 + days_to_tuesday
+    second_tuesday = first_tuesday + 7
+    return date(rel_year, rel_month, second_tuesday).isoformat()
+
+
+def _estimate_us_nfp_release_date(period_date: str) -> str:
+    """Estimate NFP release date as 1st Friday of following month.
+
+    PAYEMS reference date is month-start (e.g. 2026-01-01) and is not the BLS
+    publication date.
+    """
+    year, month, _ = map(int, period_date.split("-"))
+    rel_year = year + 1 if month == 12 else year
+    rel_month = 1 if month == 12 else month + 1
+
+    first = date(rel_year, rel_month, 1)
+    days_to_friday = (4 - first.weekday()) % 7  # Friday=4
+    first_friday = 1 + days_to_friday
+    return date(rel_year, rel_month, first_friday).isoformat()
+
+
 def fetch_cpi() -> dict:
     """Fetch latest CPI values from FRED (CPIAUCSL headline, CPILFESL core)."""
     try:
@@ -58,15 +92,17 @@ def fetch_cpi() -> dict:
         core_yoy_prev = round((c_prev - c_prev_year_ago) / c_prev_year_ago * 100, 1)
 
         period = headline_obs[0]["date"][:7]  # "YYYY-MM"
+        period_date = headline_obs[0]["date"]  # reference period (month start)
         return {
             "period": period,
+            "period_date": period_date,
             "headline_yoy": headline_yoy,
             "headline_yoy_prev": headline_yoy_prev,
             "headline_yoy_expected": None,
             "core_yoy": core_yoy,
             "core_yoy_prev": core_yoy_prev,
             "core_yoy_expected": None,
-            "release_date": headline_obs[0]["date"],
+            "release_date": _estimate_us_cpi_release_date(period_date),
             "source": "FRED",
             "is_placeholder": False,
         }
@@ -74,6 +110,7 @@ def fetch_cpi() -> dict:
         logger.warning("FRED CPI fetch failed, using placeholder: %s", exc)
         return {
             "period": "2026-01",
+            "period_date": "2026-01-01",
             "headline_yoy": 3.1,
             "headline_yoy_prev": 2.9,
             "headline_yoy_expected": None,
@@ -103,14 +140,16 @@ def fetch_nfp() -> dict:
         unemployment_rate_prev = float(unrate_obs[1]["value"])
 
         period = payroll_obs[0]["date"][:7]
+        period_date = payroll_obs[0]["date"]
         return {
             "period": period,
+            "period_date": period_date,
             "payroll_change": payroll_change,
             "payroll_change_prev": payroll_change_prev,
             "payroll_change_expected": None,
             "unemployment_rate": unemployment_rate,
             "unemployment_rate_prev": unemployment_rate_prev,
-            "release_date": payroll_obs[0]["date"],
+            "release_date": _estimate_us_nfp_release_date(period_date),
             "source": "FRED",
             "is_placeholder": False,
         }
@@ -118,6 +157,7 @@ def fetch_nfp() -> dict:
         logger.warning("FRED NFP fetch failed, using placeholder: %s", exc)
         return {
             "period": "2026-01",
+            "period_date": "2026-01-01",
             "payroll_change": 165_000,
             "payroll_change_prev": 220_000,
             "payroll_change_expected": None,

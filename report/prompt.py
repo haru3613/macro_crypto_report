@@ -8,7 +8,7 @@ REPORT_TEMPLATE_EN = """# Macro + Crypto Weekly Brief
 - CPI/NFP release timing may shift Fed expectations.
 - Yield curve (10Y-2Y): {curve_slope:.2f}%
 - Funding state: {funding_state}; OI state: {oi_state}
-- Stablecoin exchange net flow (24h): {stablecoin_24h:,}
+- Stablecoin supply delta (24h): {stablecoin_24h:,}
 
 ## Macro
 - CPI Headline YoY: {cpi_headline_yoy:.1f}% | Prev {cpi_headline_yoy_prev:.1f}% | Expected {cpi_headline_expected} (Released: {cpi_release})
@@ -30,9 +30,10 @@ REPORT_TEMPLATE_EN = """# Macro + Crypto Weekly Brief
 - Funding rate: {funding_rate:.3f}
 - Open interest: {open_interest:,} (7d change: {oi_change:.0%})
 
-## Stablecoin Flow
-- 24h: {stablecoin_24h:,}
-- 7d: {stablecoin_7d:,}
+## Stablecoin Supply
+- Total mcap: {stablecoin_total_mcap:,}
+- 24h change: {stablecoin_24h:,}
+- 7d change: {stablecoin_7d:,}
 
 ## CME Gap
 - Status: {gap_status}
@@ -50,7 +51,7 @@ REPORT_TEMPLATE_ZH = """# 宏觀 + 加密 週報摘要
 - CPI/NFP 發布時點可能改變市場對 Fed 預期。
 - 殖利率曲線（10Y-2Y）：{curve_slope:.2f}%
 - 資金費率狀態：{funding_state}；OI 狀態：{oi_state}
-- 穩定幣交易所 24h 淨流：{stablecoin_24h:,}
+- 穩定幣供給 24h 變化：{stablecoin_24h:,}
 
 ## 宏觀
 - CPI 整體年增：{cpi_headline_yoy:.1f}% | 前值 {cpi_headline_yoy_prev:.1f}% | 預期 {cpi_headline_expected}（發布日：{cpi_release}）
@@ -72,9 +73,10 @@ REPORT_TEMPLATE_ZH = """# 宏觀 + 加密 週報摘要
 - Funding Rate：{funding_rate:.3f}
 - 未平倉量：{open_interest:,}（7d 變化：{oi_change:.0%}）
 
-## 穩定幣資金流
-- 24h：{stablecoin_24h:,}
-- 7d：{stablecoin_7d:,}
+## 穩定幣供給
+- 總市值：{stablecoin_total_mcap:,}
+- 24h 變化：{stablecoin_24h:,}
+- 7d 變化：{stablecoin_7d:,}
 
 ## CME 缺口
 - 狀態：{gap_status}
