@@ -292,14 +292,14 @@ def _fetch_from_investing() -> dict | None:
 
     html_data = payload.get("data", "")
     if not html_data:
-        logger.warning("Investing.com returned empty calendar data")
+        logger.info("Investing.com returned empty calendar data")
         return None
 
     parser = _CalendarHTMLParser()
     parser.feed(html_data)
 
     if not parser.events:
-        logger.warning("Investing.com: no events parsed from HTML")
+        logger.info("Investing.com: no events parsed from HTML")
         return None
 
     result = _empty_result()
