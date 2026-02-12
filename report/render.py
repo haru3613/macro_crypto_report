@@ -64,6 +64,7 @@ def render_report(context: ReportContext, lang: str = "en") -> str:
         oi_state=context.derivatives["open_interest_state"],
         stablecoin_24h=context.stablecoin_flows["net_flow_24h"],
         stablecoin_7d=context.stablecoin_flows["net_flow_7d"],
+        stablecoin_total_mcap=context.stablecoin_flows.get("total_mcap", 0),
         gap_status=context.cme_gap["status"],
         gap_value=context.cme_gap.get("gap", 0),
         polymarket_section=_fmt_polymarket_section(context.polymarket_markets),

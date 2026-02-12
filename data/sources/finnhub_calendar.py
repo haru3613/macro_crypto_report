@@ -63,6 +63,11 @@ def _empty_result() -> dict[str, float | None]:
         "cpi_core_yoy_expected": None,
         "nfp_payroll_change_expected": None,
         "pmi_level_expected": None,
+        "cpi_release_date": None,
+        "nfp_release_date": None,
+        "pmi_release_date": None,
+        "pmi_level_actual": None,
+        "pmi_level_prev": None,
     }
 
 
@@ -132,6 +137,22 @@ def _fetch_from_fmp() -> dict | None:
 
         value = estimate * multiplier
         result[key] = int(value) if multiplier >= 1000 else round(value, 1)
+
+        event_date = event.get("date")
+        if key.startswith("cpi_") and result["cpi_release_date"] is None and event_date:
+            result["cpi_release_date"] = event_date
+        if key.startswith("nfp_") and result["nfp_release_date"] is None and event_date:
+            result["nfp_release_date"] = event_date
+        if key == "pmi_level_expected":
+            if result["pmi_release_date"] is None and event_date:
+                result["pmi_release_date"] = event_date
+            actual = event.get("actual")
+            previous = event.get("previous")
+            if actual is not None:
+                result["pmi_level_actual"] = round(actual, 1)
+            if previous is not None:
+                result["pmi_level_prev"] = round(previous, 1)
+
         matched.append({
             "key": key, "event": event_name, "estimate": estimate,
             "actual": event.get("actual"), "previous": event.get("previous"),
@@ -203,6 +224,9 @@ class _CalendarHTMLParser(HTMLParser):
 
         if tag == "tr" and "js-event-item" in cls:
             self._row = {}
+            event_dt = d.get("data-event-datetime", "")
+            if event_dt:
+                self._row["date"] = event_dt.split()[0].replace("/", "-")
         elif tag == "a" and "event" in classes:
             self._row["name"] = d.get("title", "")
         elif tag == "td":
@@ -299,9 +323,26 @@ def _fetch_from_investing() -> dict | None:
 
         value = forecast * multiplier
         result[key] = int(value) if multiplier >= 1000 else round(value, 1)
+
+        event_date = event.get("date")
+        if key.startswith("cpi_") and result["cpi_release_date"] is None and event_date:
+            result["cpi_release_date"] = event_date
+        if key.startswith("nfp_") and result["nfp_release_date"] is None and event_date:
+            result["nfp_release_date"] = event_date
+        if key == "pmi_level_expected":
+            if result["pmi_release_date"] is None and event_date:
+                result["pmi_release_date"] = event_date
+            actual = event.get("actual")
+            previous = event.get("previous")
+            if actual is not None:
+                result["pmi_level_actual"] = round(actual, 1)
+            if previous is not None:
+                result["pmi_level_prev"] = round(previous, 1)
+
         matched.append({
             "key": key, "event": event_name, "estimate": forecast,
             "actual": event.get("actual"), "previous": event.get("previous"),
+            "date": event.get("date", ""),
         })
 
     if not matched:
