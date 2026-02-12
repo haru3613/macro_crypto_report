@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
 
 
+class MissingFredApiKeyError(RuntimeError):
+    """Raised when FRED_API_KEY is unavailable."""
+
+
 def _fred_api_key() -> str:
     return os.getenv("FRED_API_KEY", "")
 
@@ -20,7 +24,7 @@ def _fetch_fred_series(series_id: str, limit: int = 2) -> list[dict]:
     """Fetch recent observations from a FRED series."""
     api_key = _fred_api_key()
     if not api_key:
-        raise ValueError("FRED_API_KEY not set")
+        raise MissingFredApiKeyError("FRED_API_KEY not set")
     params = {
         "series_id": series_id,
         "api_key": api_key,
@@ -106,6 +110,21 @@ def fetch_cpi() -> dict:
             "source": "FRED",
             "is_placeholder": False,
         }
+    except MissingFredApiKeyError as exc:
+        logger.info("FRED CPI unavailable, using placeholder: %s", exc)
+        return {
+            "period": "2026-01",
+            "period_date": "2026-01-01",
+            "headline_yoy": 3.1,
+            "headline_yoy_prev": 2.9,
+            "headline_yoy_expected": None,
+            "core_yoy": 3.3,
+            "core_yoy_prev": 3.2,
+            "core_yoy_expected": None,
+            "release_date": date(2026, 2, 13).isoformat(),
+            "source": "BLS (placeholder)",
+            "is_placeholder": True,
+        }
     except Exception as exc:
         logger.warning("FRED CPI fetch failed, using placeholder: %s", exc)
         return {
@@ -152,6 +171,20 @@ def fetch_nfp() -> dict:
             "release_date": _estimate_us_nfp_release_date(period_date),
             "source": "FRED",
             "is_placeholder": False,
+        }
+    except MissingFredApiKeyError as exc:
+        logger.info("FRED NFP unavailable, using placeholder: %s", exc)
+        return {
+            "period": "2026-01",
+            "period_date": "2026-01-01",
+            "payroll_change": 170000,
+            "payroll_change_prev": 256000,
+            "payroll_change_expected": None,
+            "unemployment_rate": 4.1,
+            "unemployment_rate_prev": 4.2,
+            "release_date": date(2026, 2, 6).isoformat(),
+            "source": "BLS (placeholder)",
+            "is_placeholder": True,
         }
     except Exception as exc:
         logger.warning("FRED NFP fetch failed, using placeholder: %s", exc)

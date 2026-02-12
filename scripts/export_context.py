@@ -64,7 +64,9 @@ def main():
     output = json.dumps(data, ensure_ascii=False, indent=2)
 
     if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(output, encoding="utf-8")
         print(f"Written to {args.output}", file=sys.stderr)
     else:
         print(output)
