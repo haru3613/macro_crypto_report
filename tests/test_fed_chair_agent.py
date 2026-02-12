@@ -4,7 +4,7 @@ import pytest
 
 from report.fed_chair_agent import (
     _hawkishness_score,
-    _fallback_fed_chair,
+    _build_analysis,
     generate_fed_chair_analysis,
 )
 from tests.conftest import make_sample_context
@@ -13,7 +13,7 @@ from tests.conftest import make_sample_context
 # ── Hawkishness score ─────────────────────────────────────────────────────────
 
 def test_hawkishness_score_high_inflation():
-    """High CPI + tight labour → score > 6 (hawkish territory)."""
+    """High CPI + tight labour -> score > 6 (hawkish territory)."""
     ctx = make_sample_context(
         macro_events_overrides={
             "cpi_headline_yoy": 4.5,
@@ -27,7 +27,7 @@ def test_hawkishness_score_high_inflation():
 
 
 def test_hawkishness_score_low_inflation_weak_labour():
-    """Low CPI + rising unemployment → score ≤ 4 (dovish territory)."""
+    """Low CPI + rising unemployment -> score <= 4 (dovish territory)."""
     ctx = make_sample_context(
         macro_events_overrides={
             "cpi_headline_yoy": 1.8,
@@ -41,7 +41,7 @@ def test_hawkishness_score_low_inflation_weak_labour():
 
 
 def test_hawkishness_score_clamped():
-    """Score must stay within 1–10."""
+    """Score must stay within 1-10."""
     ctx_hot = make_sample_context(
         macro_events_overrides={
             "cpi_headline_yoy": 9.0,
@@ -62,12 +62,12 @@ def test_hawkishness_score_clamped():
     assert 1 <= _hawkishness_score(ctx_cold) <= 10
 
 
-# ── Fallback output structure ─────────────────────────────────────────────────
+# ── Analysis output structure ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("lang", ["en", "zh-TW"])
-def test_fallback_contains_all_sections(lang):
+def test_analysis_contains_all_sections(lang):
     ctx = make_sample_context()
-    output = _fallback_fed_chair(ctx, lang=lang)
+    output = _build_analysis(ctx, lang=lang)
     if lang.startswith("zh"):
         required = [
             "政策立場", "鷹派評分",
@@ -90,45 +90,34 @@ def test_fallback_contains_all_sections(lang):
         assert section in output, f"Missing section: {section!r}"
 
 
-def test_fallback_contains_macro_values():
+def test_analysis_contains_macro_values():
     ctx = make_sample_context()
-    output = _fallback_fed_chair(ctx, lang="en")
+    output = _build_analysis(ctx, lang="en")
     me = ctx.macro_events
     assert str(me["cpi_headline_yoy"]) in output
     assert str(me["nfp_unemployment_rate"]) in output
 
 
-def test_fallback_labels_market_data():
+def test_analysis_labels_market_data():
     """FedWatch probabilities must be explicitly labelled as non-official."""
     ctx = make_sample_context()
     for lang in ("en", "zh-TW"):
-        output = _fallback_fed_chair(ctx, lang=lang)
+        output = _build_analysis(ctx, lang=lang)
         assert "non-official" in output or "非官方" in output
 
 
-# ── generate_fed_chair_analysis (no API key → fallback) ──────────────────────
+# ── generate_fed_chair_analysis ──────────────────────────────────────────────
 
-def test_generate_without_api_key_uses_fallback(monkeypatch):
-    from app.config import Settings
-    monkeypatch.setattr(
-        "report.fed_chair_agent.get_settings",
-        lambda: Settings(gemini_api_key=""),
-    )
+def test_generate_returns_rules_engine():
     ctx = make_sample_context()
     result = generate_fed_chair_analysis(ctx, "## brief", lang="en")
-    assert result["source"] == "fallback_rules"
+    assert result["source"] == "rules_engine"
     assert "hawkishness_score" in result
     assert isinstance(result["hawkishness_score"], int)
     assert "Policy Stance" in result["analysis_markdown"]
 
 
-def test_generate_returns_hawkishness_score_in_fallback():
-    from app.config import Settings
+def test_generate_returns_hawkishness_score():
     ctx = make_sample_context()
-    result = generate_fed_chair_analysis(
-        ctx,
-        "## brief",
-        lang="zh-TW",
-        settings=Settings(gemini_api_key=""),
-    )
+    result = generate_fed_chair_analysis(ctx, "## brief", lang="zh-TW")
     assert 1 <= result["hawkishness_score"] <= 10

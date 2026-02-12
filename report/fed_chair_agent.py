@@ -4,6 +4,9 @@ Interprets latest macro data through the FOMC dual-mandate framework and
 outputs a structured policy-stance analysis. Only official sources are used
 as primary evidence; market pricing is labelled explicitly as market-derived.
 
+Full AI analysis is now handled by Claude subagent (see prompts/fed_chair_analysis.md).
+This module provides the rules-based analysis used by the API endpoint.
+
 Output sections (fixed):
   1. Policy Stance + Hawkishness Score
   2. Dual Mandate Dashboard
@@ -13,14 +16,10 @@ Output sections (fixed):
   6. Citations
 """
 
-import json
 import logging
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
-from app.config import Settings, get_settings
 from report.schema import ReportContext
 
 # ── Fed target constants ──────────────────────────────────────────────────────
@@ -28,124 +27,16 @@ _PCE_TARGET = 2.0          # FOMC symmetric 2% PCE inflation target
 _NAIRU = 4.0               # Long-run neutral unemployment (SEP median, approx.)
 _NEUTRAL_RATE = 2.5        # Long-run nominal neutral rate (SEP long-run dot)
 
-# ── Gemini ────────────────────────────────────────────────────────────────────
-_GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-)
-
-_SYSTEM_PROMPT_EN = """\
-You are the Federal Reserve Chair conducting an internal policy briefing.
-Apply the FOMC dual-mandate framework (price stability at 2% PCE + maximum
-employment) to the structured macro data provided.
-
-STRICT RULES:
-- Use only official sources as primary evidence:
-  FOMC statements / SEP / minutes / press-conference transcripts /
-  Fed Governor speeches / FRED data series / BLS releases / BEA releases.
-- Market-derived data (FedWatch probabilities, futures pricing) must be
-  clearly labelled as "(market-derived, non-official)".
-- Do NOT make price predictions or investment recommendations.
-- Output ONLY the six sections below, in order, using the exact headers.
-
-OUTPUT FORMAT (markdown):
-
-## 1. Policy Stance
-[Current stance: one of Tightening / Hold / Easing / Data-Dependent Hold]
-**Hawkishness Score: X / 10** (1 = maximally dovish, 10 = maximally hawkish)
-[2–3 sentence rationale grounded in mandate gaps]
-
-## 2. Dual Mandate Dashboard
-| Indicator | Latest | Target / Threshold | Gap | Mandate Pressure |
-|---|---|---|---|---|
-| CPI Headline YoY | ... | 2.0% PCE proxy | ... | ... |
-| CPI Core YoY | ... | 2.0% PCE proxy | ... | ... |
-| NFP Payrolls (MoM) | ... | ~100–150k sustainable | ... | ... |
-| Unemployment Rate | ... | ~4.0% NAIRU | ... | ... |
-| ISM Services PMI | ... | 50 neutral | ... | ... |
-
-## 3. Reaction Function
-**Price Stability path:**
-- IF [condition] → THEN [policy response]
-- IF [condition] → THEN [policy response]
-
-**Employment path:**
-- IF [condition] → THEN [policy response]
-- IF [condition] → THEN [policy response]
-
-## 4. Communication Risk
-[Risk of market misreading Fed messaging; cite any divergence between
-dot-plot / statement language and current market pricing. Label all
-market pricing as (market-derived, non-official).]
-
-## 5. What Markets Will Trade Next
-[Next 1–2 data catalysts that could shift Fed's reaction function.
-No price forecasts — describe the conditional impact only.]
-
-## 6. Citations
-[List official sources used: FRED series IDs, BLS release dates, FOMC
-statement date / SEP vintage, Fed speech titles and dates.]
-"""
-
-_SYSTEM_PROMPT_ZH = """\
-你是美聯儲主席，正在主持一場內部政策簡報。
-依據 FOMC 雙重使命框架（物價穩定目標 PCE 2% + 充分就業）解讀提供的宏觀資料。
-
-嚴格規則：
-- 僅以官方來源作為主要依據：
-  FOMC 聲明 / SEP（季度經濟預測摘要）/ 會議記錄 / 記者會逐字稿 /
-  理事演講 / FRED 資料系列 / BLS 發布 / BEA 發布。
-- 市場衍生數據（FedWatch 機率、期貨定價）必須明確標示為「（市場定價，非官方）」。
-- 不做價格預測，不做投資建議。
-- 僅輸出以下六個區塊，依序排列，使用完全相同的標題。
-
-輸出格式（markdown）：
-
-## 1. 政策立場
-[當前立場：緊縮 / 按兵不動 / 寬鬆 / 數據依賴的按兵不動 之一]
-**鷹派評分：X / 10**（1 = 最鴿，10 = 最鷹）
-[2–3 句依據使命缺口的理由]
-
-## 2. 雙重使命儀表板
-| 指標 | 最新值 | 目標 / 門檻 | 缺口 | 使命壓力 |
-|---|---|---|---|---|
-| CPI 整體年增 | ... | PCE 代理 2.0% | ... | ... |
-| CPI 核心年增 | ... | PCE 代理 2.0% | ... | ... |
-| NFP 非農就業（月增） | ... | 可持續約 10–15 萬 | ... | ... |
-| 失業率 | ... | NAIRU 約 4.0% | ... | ... |
-| ISM 服務業 PMI | ... | 50 中性 | ... | ... |
-
-## 3. 反應函數
-**物價穩定路徑：**
-- 若 [條件] → 則 [政策回應]
-- 若 [條件] → 則 [政策回應]
-
-**就業路徑：**
-- 若 [條件] → 則 [政策回應]
-- 若 [條件] → 則 [政策回應]
-
-## 4. 溝通風險
-[市場誤讀 Fed 訊號的風險；引用點陣圖 / 聲明措辭與當前市場定價的偏差。
-所有市場定價需標示為（市場定價，非官方）。]
-
-## 5. 市場下一步交易什麼
-[未來 1–2 個能改變 Fed 反應函數的資料催化劑。
-不做價格預測——僅描述條件式影響。]
-
-## 6. 引用來源
-[列出使用的官方來源：FRED 系列代碼、BLS 發布日期、FOMC 聲明日期 / SEP
-版本、Fed 演講標題與日期。]
-"""
-
 
 # ── Hawkishness score (rules-based) ──────────────────────────────────────────
 
 def _hawkishness_score(context: ReportContext) -> int:
-    """Compute a 1–10 hawkishness score from mandate gap signals.
+    """Compute a 1-10 hawkishness score from mandate gap signals.
 
     Scale:
-      1–3  Dovish  — significant labour weakness or inflation at/below target
-      4–6  Neutral — data-dependent hold territory
-      7–10 Hawkish — inflation persistently above target / labour market tight
+      1-3  Dovish  -- significant labour weakness or inflation at/below target
+      4-6  Neutral -- data-dependent hold territory
+      7-10 Hawkish -- inflation persistently above target / labour market tight
     """
     score = 5  # baseline neutral
 
@@ -186,7 +77,7 @@ def _hawkishness_score(context: ReportContext) -> int:
     elif pmi < 48:
         score -= 1
 
-    # ── Financial conditions (deeply inverted curve → tighter de facto) ───────
+    # ── Financial conditions (deeply inverted curve -> tighter de facto) ──────
     if curve_slope < -0.5:
         score -= 1   # financial conditions already tight, less need to hike
 
@@ -233,7 +124,7 @@ def _mandate_pressure(gap: float, direction: str = "above") -> str:
     return "🟢 Near NAIRU"
 
 
-def _fallback_fed_chair(context: ReportContext, lang: str = "en") -> str:
+def _build_analysis(context: ReportContext, lang: str = "en") -> str:
     me = context.macro_events
     score = _hawkishness_score(context)
     stance = _stance_label(score, lang)
@@ -341,7 +232,7 @@ Dual-mandate signals {'both point to maintaining restrictive rates' if score >= 
 |---|---|---|---|---|---|
 | CPI Headline YoY | {headline:.1f}% | {headline_prev:.1f}% | 2.0% PCE proxy | {h_gap:+.1f}% | {h_pressure} |
 | CPI Core YoY | {core:.1f}% | {core_prev:.1f}% | 2.0% PCE proxy | {c_gap:+.1f}% | {c_pressure} |
-| NFP Payrolls (MoM) | {payroll:+,} | {payroll_prev:+,} | ~100–150k sustainable | — | {payroll_label} |
+| NFP Payrolls (MoM) | {payroll:+,} | {payroll_prev:+,} | ~100-150k sustainable | — | {payroll_label} |
 | Unemployment Rate | {unemp:.1f}% | {unemp_prev:.1f}% | ~4.0% NAIRU | {u_gap:+.1f}% | {u_pressure} |
 | ISM Services PMI | {pmi} | {pmi_prev} | 50 neutral | {pmi_gap:+.1f} | {pmi_pressure} |
 | 10Y Treasury Yield | {ten_year:.2f}% | — | — | — | — |
@@ -349,17 +240,17 @@ Dual-mandate signals {'both point to maintaining restrictive rates' if score >= 
 
 ## 3. Reaction Function
 **Price stability path:**
-- IF core CPI stays above 2.5% for 3+ months → THEN pause cuts, re-assess whether policy is sufficiently restrictive
-- IF headline + core both trend toward 2.0–2.5% → THEN further cuts become appropriate
-- IF 5Y5Y inflation breakeven rises materially → THEN hawkish language returns to FOMC statement
+- IF core CPI stays above 2.5% for 3+ months -> THEN pause cuts, re-assess whether policy is sufficiently restrictive
+- IF headline + core both trend toward 2.0-2.5% -> THEN further cuts become appropriate
+- IF 5Y5Y inflation breakeven rises materially -> THEN hawkish language returns to FOMC statement
 
 **Employment path:**
-- IF NFP < 75k for two consecutive months OR unemployment breaches 4.5% → THEN accelerate easing discussion
-- IF unemployment holds near {unemp:.1f}% while inflation stays elevated → THEN maintain current restrictive stance, no change
+- IF NFP < 75k for two consecutive months OR unemployment breaches 4.5% -> THEN accelerate easing discussion
+- IF unemployment holds near {unemp:.1f}% while inflation stays elevated -> THEN maintain current restrictive stance, no change
 
 ## 4. Communication Risk
 FedWatch pricing (market-derived, non-official): Cut {prob_cut:.0%} / Hold {prob_hold:.0%} / Hike {prob_hike:.0%}. \
-{'Market is pricing meaningful cut probability against FOMC’s "data-dependent" language—a CPI upside surprise could force rapid repricing.' if prob_cut > 0.3 else 'Market pricing broadly aligned with a neutral Fed posture; risk is a faster-than-expected dovish pivot if labour data deteriorates sharply.'} \
+{'Market is pricing meaningful cut probability against the FOMC "data-dependent" language—a CPI upside surprise could force rapid repricing.' if prob_cut > 0.3 else 'Market pricing broadly aligned with a neutral Fed posture; risk is a faster-than-expected dovish pivot if labour data deteriorates sharply.'} \
 Yield curve currently {"inverted" if curve_slope < 0 else "positive"} ({curve_slope:+.2f}%), \
 {"suggesting markets anticipate easing ahead of any explicit Fed signal." if curve_slope < 0 else "a marginal improvement in financial conditions."}
 
@@ -371,89 +262,24 @@ Yield curve currently {"inverted" if curve_slope < 0 else "positive"} ({curve_sl
 ## 6. Citations
 - **FRED series**: CPIAUCSL (CPI Headline), CPILFESL (CPI Core), PAYEMS (Non-farm payrolls level), UNRATE, DGS10, DGS2
 - **ISM Services PMI**: ISM release (Placeholder — NAPM series discontinued on FRED)
-- **FOMC calendar**: Static 2025–2026 meeting dates (source: federalreserve.gov)
+- **FOMC calendar**: Static 2025-2026 meeting dates (source: federalreserve.gov)
 - **FedWatch probabilities**: CME FedWatch (market-derived, non-official)
 - Note: All CPI figures are BLS/FRED proxy values; strict mandate analysis requires BEA PCE release."""
-
-
-# ── Gemini call ───────────────────────────────────────────────────────────────
-
-def _build_user_message(context: ReportContext, report_markdown: str, lang: str) -> str:
-    return (
-        f"Language preference: {lang}\n\n"
-        "Structured macro context (JSON):\n"
-        f"{json.dumps(context.model_dump(), ensure_ascii=True)}\n\n"
-        "Weekly markdown brief for reference:\n"
-        f"{report_markdown}"
-    )
 
 
 def generate_fed_chair_analysis(
     context: ReportContext,
     report_markdown: str,
     lang: str = "en",
-    settings: Settings | None = None,
+    settings: object | None = None,
 ) -> dict:
-    """Run the Fed Chair sub-agent. Returns a dict with analysis_markdown + metadata."""
-    settings = settings or get_settings()
+    """Run the Fed Chair sub-agent (rules-based).
 
-    if not settings.gemini_api_key:
-        return {
-            "analysis_markdown": _fallback_fed_chair(context, lang=lang),
-            "source": "fallback_rules",
-            "model": "none",
-            "hawkishness_score": _hawkishness_score(context),
-        }
-
-    system_prompt = (
-        _SYSTEM_PROMPT_ZH if lang.lower().startswith("zh") else _SYSTEM_PROMPT_EN
-    )
-    url = (
-        _GEMINI_API_URL.format(model=settings.gemini_model)
-        + "?"
-        + urlencode({"key": settings.gemini_api_key})
-    )
-    request_body = {
-        "system_instruction": {"parts": [{"text": system_prompt}]},
-        "contents": [
-            {"parts": [{"text": _build_user_message(context, report_markdown, lang)}]}
-        ],
-        "generationConfig": {
-            "temperature": 0.1,   # Low temperature: policy analysis demands consistency
-            "maxOutputTokens": 1200,
-        },
+    Full AI analysis is done via Claude subagent (prompts/fed_chair_analysis.md).
+    """
+    return {
+        "analysis_markdown": _build_analysis(context, lang=lang),
+        "source": "rules_engine",
+        "model": "none",
+        "hawkishness_score": _hawkishness_score(context),
     }
-
-    try:
-        req = Request(
-            url,
-            data=json.dumps(request_body).encode("utf-8"),
-            method="POST",
-            headers={"Content-Type": "application/json"},
-        )
-        with urlopen(req, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-
-        candidates = payload.get("candidates", [])
-        if not candidates:
-            raise ValueError("Empty candidates in Gemini response")
-        parts = candidates[0].get("content", {}).get("parts", [])
-        text = "\n".join(p.get("text", "") for p in parts if p.get("text")).strip()
-        if not text:
-            raise ValueError("Empty text in Gemini response")
-
-        return {
-            "analysis_markdown": text,
-            "source": "gemini",
-            "model": settings.gemini_model,
-            "hawkishness_score": _hawkishness_score(context),
-        }
-    except Exception as exc:
-        logger.error("Gemini Fed Chair call failed, falling back to rules: %s", exc)
-        return {
-            "analysis_markdown": _fallback_fed_chair(context, lang=lang),
-            "source": "fallback_rules",
-            "model": settings.gemini_model,
-            "error": str(exc),
-            "hawkishness_score": _hawkishness_score(context),
-        }

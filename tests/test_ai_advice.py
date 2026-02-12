@@ -1,34 +1,24 @@
-from app.config import Settings
-from conftest import FakeResponse, make_sample_context
+from conftest import make_sample_context
 from report.ai_advice import generate_ai_advice
 
 
-def test_generate_ai_advice_fallback_without_key():
+def test_generate_ai_advice_returns_rules_engine():
     context = make_sample_context()
-    advice = generate_ai_advice(
-        context,
-        "# test",
-        settings=Settings(gemini_api_key=""),
-    )
-    assert advice["source"] == "fallback_rules"
+    advice = generate_ai_advice(context, "# test")
+    assert advice["source"] == "rules_engine"
+    assert advice["model"] == "none"
+    assert "Market Regime" in advice["analysis_markdown"] or "市場型態" in advice["analysis_markdown"]
+
+
+def test_generate_ai_advice_zh():
+    context = make_sample_context()
+    advice = generate_ai_advice(context, "# test", lang="zh-TW")
+    assert "市場型態" in advice["analysis_markdown"]
+    assert "核心風險" in advice["analysis_markdown"]
+
+
+def test_generate_ai_advice_en():
+    context = make_sample_context()
+    advice = generate_ai_advice(context, "# test", lang="en")
+    assert "Market Regime" in advice["analysis_markdown"]
     assert "Top Risks" in advice["analysis_markdown"]
-
-
-def test_generate_ai_advice_gemini_success(monkeypatch):
-    context = make_sample_context()
-    payload = '{"candidates":[{"content":{"parts":[{"text":"## AI\\n- Keep risk tight"}]}}]}'
-
-    def fake_urlopen(_req, timeout=30):
-        assert timeout == 30
-        return FakeResponse(payload)
-
-    monkeypatch.setattr("report.ai_advice.urlopen", fake_urlopen)
-
-    advice = generate_ai_advice(
-        context,
-        "# test",
-        settings=Settings(gemini_api_key="test-key", gemini_model="gemini-2.5-pro"),
-    )
-    assert advice["source"] == "gemini"
-    assert advice["model"] == "gemini-2.5-pro"
-    assert "Keep risk tight" in advice["analysis_markdown"]

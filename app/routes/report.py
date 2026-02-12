@@ -5,7 +5,6 @@ from typing import Literal
 from fastapi import APIRouter
 from fastapi import Query
 
-from app.config import get_settings
 from data.fetch_all import fetch_all_sources
 from indicators.compute import compute_report_context
 from report.ai_advice import generate_ai_advice
@@ -36,7 +35,7 @@ def weekly_report(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dict
 @router.get("/weekly/advice")
 def weekly_report_with_ai_advice(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dict:
     context, markdown = _build_weekly_payload(lang=lang)
-    advice = generate_ai_advice(context, markdown, lang=lang, settings=get_settings())
+    advice = generate_ai_advice(context, markdown, lang=lang)
     service = get_signal_service()
     signals = service.latest_signals()
     summary = summarize_signals(signals)
@@ -50,9 +49,9 @@ def weekly_report_with_ai_advice(lang: Literal["en", "zh-TW"] = Query(default="z
 
 @router.get("/weekly/ai")
 def ai_advice_only(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dict:
-    """Generate AI advice only, without re-fetching all source data."""
+    """Generate rules-based market analysis."""
     context, markdown = _build_weekly_payload(lang=lang)
-    advice = generate_ai_advice(context, markdown, lang=lang, settings=get_settings())
+    advice = generate_ai_advice(context, markdown, lang=lang)
     return advice
 
 
@@ -60,9 +59,7 @@ def ai_advice_only(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dic
 def fed_chair_analysis(lang: Literal["en", "zh-TW"] = Query(default="zh-TW")) -> dict:
     """Fed Chair (Powell-style) sub-agent: FOMC dual-mandate policy analysis."""
     context, markdown = _build_weekly_payload(lang=lang)
-    analysis = generate_fed_chair_analysis(
-        context, markdown, lang=lang, settings=get_settings()
-    )
+    analysis = generate_fed_chair_analysis(context, markdown, lang=lang)
     return {
         "context": context.model_dump(),
         "fed_chair_analysis": analysis,

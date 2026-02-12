@@ -189,7 +189,7 @@ const ALL_SOURCES = [
   { key: "Crypto Derivatives", labelZh: "加密衍生品", labelEn: "Crypto Derivatives", kpiIds: ["funding-state", "oi-state", "funding-rate", "oi-change"] },
   { key: "Stablecoin Flows", labelZh: "穩定幣流向", labelEn: "Stablecoin Flows", kpiIds: ["flow-24h", "flow-7d"] },
   { key: "Polymarket", labelZh: "Polymarket 預測市場", labelEn: "Polymarket Predictions", kpiIds: [] },
-  { key: "Finnhub Consensus", labelZh: "Finnhub 預期值", labelEn: "Finnhub Consensus", kpiIds: ["cpi-headline-exp", "cpi-core-exp", "nfp-payroll-exp", "pmi-level-exp"] },
+  { key: "Consensus Estimates", labelZh: "預期值 (Consensus)", labelEn: "Consensus Estimates", kpiIds: ["cpi-headline-exp", "cpi-core-exp", "nfp-payroll-exp", "pmi-level-exp"] },
 ];
 
 let currentLang = "zh-TW";

@@ -73,6 +73,18 @@ Both use ATR-based entry/stop/TP bands and confidence-based position sizing (3-8
 | Stablecoin flows | DefiLlama | No |
 | FOMC schedule | Static 2025-2026 calendar | No |
 | FedWatch | **Placeholder only** (no free API) | — |
+| Consensus estimates | FMP (paid) → Investing.com (free fallback) | FMP_API_KEY (optional) |
 | Polymarket | Gamma API (macro markets) | No |
-| AI advice | Gemini `generateContent` API | GEMINI_API_KEY |
-| Fed Chair agent | Gemini `generateContent` API (fallback: rules-based) | GEMINI_API_KEY |
+| AI advice | Rules engine (Claude subagent for full analysis) | No |
+| Fed Chair agent | Rules engine (Claude subagent for full analysis) | No |
+
+## AI Analysis (Claude Subagent)
+
+AI-powered analysis is done via Claude Code subagent instead of external APIs.
+
+**Prompts**: `prompts/weekly_ai_advice.md` and `prompts/fed_chair_analysis.md`
+
+**Workflow**:
+1. Run `python scripts/export_context.py` to get current data (or fetch from running API)
+2. Ask Claude to analyze using the prompt + data
+3. API endpoints (`/weekly/ai`, `/weekly/fed-chair`) provide rules-based fallback

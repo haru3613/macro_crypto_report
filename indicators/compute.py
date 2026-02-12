@@ -20,7 +20,7 @@ _SOURCE_LABELS = {
     "crypto_derivs": "Crypto Derivatives",
     "stablecoin_flows": "Stablecoin Flows",
     "polymarket": "Polymarket",
-    "consensus": "Finnhub Consensus",
+    "consensus": "Consensus Estimates",
 }
 
 

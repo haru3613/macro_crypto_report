@@ -15,10 +15,8 @@ class Settings:
     app_name: str = "Macro Crypto Report"
     report_timezone: str = "UTC"
     report_locale: str = "zh-TW"
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
     fred_api_key: str = ""
-    finnhub_api_key: str = ""
+    fmp_api_key: str = ""
     sqlite_path: str = "runtime/macro_crypto.db"
     top_n_symbols: int = 10
     short_refresh_minutes: int = 15
@@ -32,10 +30,8 @@ def get_settings() -> Settings:
         app_name=os.getenv("APP_NAME", "Macro Crypto Report"),
         report_timezone=os.getenv("REPORT_TIMEZONE", "UTC"),
         report_locale=os.getenv("REPORT_LOCALE", "zh-TW"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         fred_api_key=os.getenv("FRED_API_KEY", ""),
-        finnhub_api_key=os.getenv("FINNHUB_API_KEY", ""),
+        fmp_api_key=os.getenv("FMP_API_KEY", ""),
         sqlite_path=os.getenv("SQLITE_PATH", "runtime/macro_crypto.db"),
         top_n_symbols=int(os.getenv("TOP_N_SYMBOLS", "10")),
         short_refresh_minutes=int(os.getenv("SHORT_REFRESH_MINUTES", "15")),
