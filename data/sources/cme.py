@@ -11,8 +11,11 @@ logger = logging.getLogger(__name__)
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 
 
-def fetch_cme_ohlc() -> list[dict]:
-    """Fetch recent BTC daily OHLC from Binance as a CME proxy."""
+def fetch_cme_ohlc() -> list[dict] | None:
+    """Fetch recent BTC daily OHLC from Binance as a CME proxy.
+
+    Returns None when data is unavailable.
+    """
     try:
         params = {"symbol": "BTCUSDT", "interval": "1d", "limit": 3}
         url = f"{BINANCE_KLINES_URL}?{urlencode(params)}"
@@ -34,24 +37,5 @@ def fetch_cme_ohlc() -> list[dict]:
             })
         return candles
     except Exception as exc:
-        logger.warning("Binance daily klines fetch failed, using placeholder: %s", exc)
-        return [
-            {
-                "date": date(2026, 2, 8).isoformat(),
-                "open": 43_500,
-                "high": 44_200,
-                "low": 42_900,
-                "close": 43_900,
-                "source": "CME (placeholder)",
-                "is_placeholder": True,
-            },
-            {
-                "date": date(2026, 2, 9).isoformat(),
-                "open": 44_050,
-                "high": 44_800,
-                "low": 43_600,
-                "close": 44_500,
-                "source": "CME (placeholder)",
-                "is_placeholder": True,
-            },
-        ]
+        logger.warning("Binance daily klines fetch failed: %s", exc)
+        return None

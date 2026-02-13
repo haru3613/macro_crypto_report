@@ -52,7 +52,12 @@ def _fetch_active_macro_markets() -> list[dict]:
 
         outcomes = m.get("outcomes") or []
         prices_raw = m.get("outcomePrices") or []
-        # outcomePrices may be a JSON string or a list
+        # outcomes and outcomePrices may be JSON strings or lists
+        if isinstance(outcomes, str):
+            try:
+                outcomes = json.loads(outcomes)
+            except (json.JSONDecodeError, ValueError):
+                outcomes = []
         if isinstance(prices_raw, str):
             try:
                 prices_raw = json.loads(prices_raw)
@@ -86,24 +91,10 @@ def _fetch_active_macro_markets() -> list[dict]:
     return results
 
 
-def fetch_polymarket_macro() -> dict:
+def fetch_polymarket_macro() -> dict | None:
     """Return active macro prediction markets from Polymarket.
 
-    Result schema:
-    {
-        "markets": [
-            {
-                "question": "Will February CPI exceed 3.0%?",
-                "outcomes": {"Yes": 0.35, "No": 0.65},
-                "volume_usd": 450000,
-                "end_date": "2026-03-15",
-                "slug": "will-february-cpi-exceed-3-percent"
-            },
-            ...
-        ],
-        "source": "Polymarket (market-derived, non-official)",
-        "is_placeholder": False
-    }
+    Returns None when data is unavailable.
     """
     try:
         markets = _fetch_active_macro_markets()
@@ -115,24 +106,5 @@ def fetch_polymarket_macro() -> dict:
             "is_placeholder": False,
         }
     except Exception as exc:
-        logger.warning("Polymarket fetch failed, using placeholder: %s", exc)
-        return {
-            "markets": [
-                {
-                    "question": "Will the Fed cut rates at the March 2026 FOMC meeting?",
-                    "outcomes": {"Yes": 0.25, "No": 0.75},
-                    "volume_usd": 120_000,
-                    "end_date": "2026-03-19",
-                    "slug": "placeholder",
-                },
-                {
-                    "question": "Will February CPI YoY exceed 3.0%?",
-                    "outcomes": {"Yes": 0.35, "No": 0.65},
-                    "volume_usd": 80_000,
-                    "end_date": "2026-03-12",
-                    "slug": "placeholder",
-                },
-            ],
-            "source": "Polymarket (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.warning("Polymarket fetch failed: %s", exc)
+        return None

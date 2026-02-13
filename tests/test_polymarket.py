@@ -72,13 +72,40 @@ def test_fetch_polymarket_macro_outcome_prices():
     assert abs(cpi_market["outcomes"]["No"] - 0.65) < 0.001
 
 
-def test_fetch_polymarket_macro_fallback_on_error():
+def test_fetch_polymarket_macro_returns_none_on_error():
     def bad_urlopen(url, timeout=10):
         raise ConnectionError("network error")
     with patch("data.sources.polymarket.urlopen", bad_urlopen):
         result = fetch_polymarket_macro()
-    assert result["is_placeholder"] is True
-    assert len(result["markets"]) > 0   # fallback data present
+    assert result is None
+
+
+def test_fetch_polymarket_macro_outcomes_as_json_string():
+    """outcomes and outcomePrices returned as JSON strings (not lists)."""
+    json_string_markets = [
+        {
+            "question": "Will February CPI YoY exceed 3.0%?",
+            "outcomes": '["Yes", "No"]',
+            "outcomePrices": '["0.35", "0.65"]',
+            "volume": "95000",
+            "endDate": "2026-03-12T00:00:00Z",
+            "slug": "cpi-above-3-feb",
+            "tags": [{"label": "CPI"}],
+            "active": True,
+            "closed": False,
+        }
+    ]
+    def json_str_urlopen(url, timeout=10):
+        class R:
+            def read(self): return json.dumps(json_string_markets).encode()
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        return R()
+    with patch("data.sources.polymarket.urlopen", json_str_urlopen):
+        result = fetch_polymarket_macro()
+    cpi_market = result["markets"][0]
+    assert cpi_market["outcomes"]["Yes"] == 0.35
+    assert cpi_market["outcomes"]["No"] == 0.65
 
 
 def test_fetch_polymarket_macro_low_volume_filtered():
@@ -103,5 +130,5 @@ def test_fetch_polymarket_macro_low_volume_filtered():
         return R()
     with patch("data.sources.polymarket.urlopen", low_vol_urlopen):
         result = fetch_polymarket_macro()
-    # Falls back to placeholder because no market exceeds volume threshold
-    assert result["is_placeholder"] is True
+    # Returns None because no market exceeds volume threshold
+    assert result is None

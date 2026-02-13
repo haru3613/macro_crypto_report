@@ -26,7 +26,8 @@ def _fetch_latest_fred_rate(csv_url: str, column: str) -> tuple[str, float]:
     raise ValueError(f"No valid values found for {column}")
 
 
-def fetch_yield_curve() -> dict:
+def fetch_yield_curve() -> dict | None:
+    """Returns None when data is unavailable."""
     try:
         ten_year_date, ten_year = _fetch_latest_fred_rate(FRED_DGS10_CSV, "DGS10")
         two_year_date, two_year = _fetch_latest_fred_rate(FRED_DGS2_CSV, "DGS2")
@@ -39,11 +40,5 @@ def fetch_yield_curve() -> dict:
             "is_placeholder": False,
         }
     except Exception as exc:
-        logger.warning("FRED yield curve fetch failed, using placeholder: %s", exc)
-        return {
-            "as_of": date(2026, 2, 9).isoformat(),
-            "ten_year": 4.05,
-            "two_year": 4.35,
-            "source": "Treasury yields (placeholder fallback)",
-            "is_placeholder": True,
-        }
+        logger.warning("FRED yield curve fetch failed: %s", exc)
+        return None

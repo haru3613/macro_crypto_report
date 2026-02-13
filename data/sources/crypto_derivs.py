@@ -12,8 +12,11 @@ BINANCE_OI_URL = "https://fapi.binance.com/fapi/v1/openInterest"
 BINANCE_OI_HIST_URL = "https://fapi.binance.com/futures/data/openInterestHist"
 
 
-def fetch_crypto_derivatives() -> dict:
-    """Fetch BTC funding rate and open interest from Binance Futures."""
+def fetch_crypto_derivatives() -> dict | None:
+    """Fetch BTC funding rate and open interest from Binance Futures.
+
+    Returns None when data is unavailable.
+    """
     try:
         # Funding rate
         with urlopen(f"{BINANCE_FUNDING_URL}?symbol=BTCUSDT&limit=1", timeout=15) as resp:
@@ -48,12 +51,5 @@ def fetch_crypto_derivatives() -> dict:
             "is_placeholder": False,
         }
     except Exception as exc:
-        logger.warning("Binance derivatives fetch failed, using placeholder: %s", exc)
-        return {
-            "as_of": date.today().isoformat(),
-            "funding_rate": 0.012,
-            "open_interest": 21_500_000_000,
-            "open_interest_change_7d": -0.03,
-            "source": "Binance Futures (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.warning("Binance derivatives fetch failed: %s", exc)
+        return None

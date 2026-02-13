@@ -18,6 +18,9 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 
 def _fetch_from_api(lang: str) -> dict | None:
     """Try fetching from running API server."""

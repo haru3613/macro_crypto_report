@@ -5,16 +5,17 @@ from signals.schema import RegimeState
 
 
 def derive_regime_state(
-    yield_curve_slope: float,
+    yield_curve_slope: float | None,
     event_risk_week: bool,
     btc_daily_volatility: float,
     config: RegimeConfig = RegimeConfig(),
 ) -> RegimeState:
     macro_regime = "neutral"
-    if yield_curve_slope < config.yield_curve_risk_off:
-        macro_regime = "risk_off_bias"
-    elif yield_curve_slope > config.yield_curve_risk_on:
-        macro_regime = "risk_on_bias"
+    if yield_curve_slope is not None:
+        if yield_curve_slope < config.yield_curve_risk_off:
+            macro_regime = "risk_off_bias"
+        elif yield_curve_slope > config.yield_curve_risk_on:
+            macro_regime = "risk_on_bias"
 
     if btc_daily_volatility >= config.vol_high_threshold:
         vol_regime = "high_vol"

@@ -72,8 +72,11 @@ def _estimate_us_nfp_release_date(period_date: str) -> str:
     return date(rel_year, rel_month, first_friday).isoformat()
 
 
-def fetch_cpi() -> dict:
-    """Fetch latest CPI values from FRED (CPIAUCSL headline, CPILFESL core)."""
+def fetch_cpi() -> dict | None:
+    """Fetch latest CPI values from FRED (CPIAUCSL headline, CPILFESL core).
+
+    Returns None when data is unavailable (missing API key or fetch error).
+    """
     try:
         headline_obs = _fetch_fred_series("CPIAUCSL", limit=14)
         core_obs = _fetch_fred_series("CPILFESL", limit=14)
@@ -111,39 +114,18 @@ def fetch_cpi() -> dict:
             "is_placeholder": False,
         }
     except MissingFredApiKeyError as exc:
-        logger.info("FRED CPI unavailable, using placeholder: %s", exc)
-        return {
-            "period": "2026-01",
-            "period_date": "2026-01-01",
-            "headline_yoy": 3.1,
-            "headline_yoy_prev": 2.9,
-            "headline_yoy_expected": None,
-            "core_yoy": 3.3,
-            "core_yoy_prev": 3.2,
-            "core_yoy_expected": None,
-            "release_date": date(2026, 2, 13).isoformat(),
-            "source": "BLS (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.info("FRED CPI unavailable (no API key): %s", exc)
+        return None
     except Exception as exc:
-        logger.warning("FRED CPI fetch failed, using placeholder: %s", exc)
-        return {
-            "period": "2026-01",
-            "period_date": "2026-01-01",
-            "headline_yoy": 3.1,
-            "headline_yoy_prev": 2.9,
-            "headline_yoy_expected": None,
-            "core_yoy": 3.3,
-            "core_yoy_prev": 3.2,
-            "core_yoy_expected": None,
-            "release_date": date(2026, 2, 13).isoformat(),
-            "source": "BLS (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.warning("FRED CPI fetch failed: %s", exc)
+        return None
 
 
-def fetch_nfp() -> dict:
-    """Fetch latest NFP values from FRED (PAYEMS payrolls, UNRATE unemployment)."""
+def fetch_nfp() -> dict | None:
+    """Fetch latest NFP values from FRED (PAYEMS payrolls, UNRATE unemployment).
+
+    Returns None when data is unavailable (missing API key or fetch error).
+    """
     try:
         payroll_obs = _fetch_fred_series("PAYEMS", limit=3)
         unrate_obs = _fetch_fred_series("UNRATE", limit=2)
@@ -173,30 +155,8 @@ def fetch_nfp() -> dict:
             "is_placeholder": False,
         }
     except MissingFredApiKeyError as exc:
-        logger.info("FRED NFP unavailable, using placeholder: %s", exc)
-        return {
-            "period": "2026-01",
-            "period_date": "2026-01-01",
-            "payroll_change": 170000,
-            "payroll_change_prev": 256000,
-            "payroll_change_expected": None,
-            "unemployment_rate": 4.1,
-            "unemployment_rate_prev": 4.2,
-            "release_date": date(2026, 2, 6).isoformat(),
-            "source": "BLS (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.info("FRED NFP unavailable (no API key): %s", exc)
+        return None
     except Exception as exc:
-        logger.warning("FRED NFP fetch failed, using placeholder: %s", exc)
-        return {
-            "period": "2026-01",
-            "period_date": "2026-01-01",
-            "payroll_change": 165_000,
-            "payroll_change_prev": 220_000,
-            "payroll_change_expected": None,
-            "unemployment_rate": 3.8,
-            "unemployment_rate_prev": 4.0,
-            "release_date": date(2026, 2, 7).isoformat(),
-            "source": "BLS (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.warning("FRED NFP fetch failed: %s", exc)
+        return None

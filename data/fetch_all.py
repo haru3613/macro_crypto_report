@@ -16,16 +16,16 @@ from data.sources.stablecoin import fetch_stablecoin_flows
 
 @dataclass(frozen=True)
 class RawReportData:
-    cpi: dict
-    nfp: dict
+    cpi: dict | None
+    nfp: dict | None
     pmi: dict
     fomc: dict
     fedwatch: dict
-    yield_curve: dict
-    cme_ohlc: list[dict]
-    crypto_derivs: dict
-    stablecoin_flows: dict
-    polymarket: dict
+    yield_curve: dict | None
+    cme_ohlc: list[dict] | None
+    crypto_derivs: dict | None
+    stablecoin_flows: dict | None
+    polymarket: dict | None
     consensus: dict
 
 

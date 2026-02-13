@@ -10,8 +10,11 @@ logger = logging.getLogger(__name__)
 DEFILLAMA_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
 
 
-def fetch_stablecoin_flows() -> dict:
-    """Fetch aggregate stablecoin market cap and supply delta proxy from DefiLlama."""
+def fetch_stablecoin_flows() -> dict | None:
+    """Fetch aggregate stablecoin market cap and supply delta proxy from DefiLlama.
+
+    Returns None when data is unavailable.
+    """
     try:
         with urlopen(DEFILLAMA_STABLECOINS_URL, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -41,12 +44,5 @@ def fetch_stablecoin_flows() -> dict:
             "is_placeholder": False,
         }
     except Exception as exc:
-        logger.warning("DefiLlama stablecoin fetch failed, using placeholder: %s", exc)
-        return {
-            "as_of": date.today().isoformat(),
-            "net_flow_24h": -250_000_000,
-            "net_flow_7d": 1_200_000_000,
-            "total_mcap": 0,
-            "source": "DefiLlama (placeholder)",
-            "is_placeholder": True,
-        }
+        logger.warning("DefiLlama stablecoin fetch failed: %s", exc)
+        return None
