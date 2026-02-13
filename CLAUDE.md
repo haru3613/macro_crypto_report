@@ -25,7 +25,7 @@ docker compose up --build
 
 **Data pipeline**: `data/sources/` → `data/fetch_all.py` → `indicators/compute.py` → `report/` + `signals/`
 
-The system fetches from 9 external sources (FRED, Binance, CoinGecko, DefiLlama, etc.), each with a try/except fallback to placeholder data. Every source dict includes an `is_placeholder: bool` field. The `indicators/compute.py` layer transforms `RawReportData` into a `ReportContext`, collecting which sources used fallback data into `placeholder_sources`.
+The system fetches from 9 external sources (FRED, Binance, CoinGecko, DefiLlama, etc.). Sources with live APIs return `None` on failure (no fake placeholder data). Only ISM PMI and FedWatch use static placeholders (no free API exists). The `indicators/compute.py` layer transforms `RawReportData` into a `ReportContext`, handling `None` sources gracefully (displaying "N/A") and collecting unavailable sources into `placeholder_sources`.
 
 **Signal engine** (`signals/engine.py`): Generates two timeframes:
 - **15m short-term**: EMA 9/21 crossover + RSI 14 + volume ratio → buy/sell/hold
